@@ -1,0 +1,14 @@
+.DS_Store
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+coverage/
+.remember/
+
+*.swp
+*.kate-swp
+.idea/
