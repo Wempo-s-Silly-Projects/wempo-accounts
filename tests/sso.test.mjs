@@ -55,8 +55,8 @@ function ticketRequest(returnOrigin, overrides = {}) {
   });
 }
 
-function redeemEnv({ changes = 1, user = null } = {}) {
-  const env = { ...limiters() };
+function redeemEnv({ changes = 1, user = null, redeemFail = false } = {}) {
+  const env = { ...limiters(redeemFail ? { redeem: true } : {}) };
   env.RELAY_TOKEN = RELAY_TOKEN;
   env.GOOBER_DB = fakeDb([
     { test: (sql) => sql.startsWith("UPDATE wa_login_tickets"), run: async () => ({ changes }) },
@@ -225,6 +225,38 @@ test("a junk/absent worker stamp is stored as 'unknown' — the header shape is 
     const updates = env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
     assert.equal(updates[0].bound[1], "unknown", "a non-slug stamp never enters the row as-is");
   }
+});
+
+test("the redeem lane carries its own throttle: the keyed bucket answers BEFORE any storage question", async () => {
+  const user = { id: 7, username: "wempos", role: "moderator" };
+
+  // A refused bucket is a 429 and the D1 UPDATE never happens — the throttle
+  // precedes the redeem entirely (no browser IP rides the binding lane).
+  const throttled = redeemEnv({ changes: 1, user, redeemFail: true });
+  const response = await dispatch(
+    redeemRequest("ab".repeat(32), { "X-Relay-Worker": "wempos-forum" }),
+    throttled,
+  );
+  assert.equal(response.status, 429);
+  assert.match(response.headers.get("Retry-After") || "", /^\d+$/);
+  const writes = throttled.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
+  assert.equal(writes.length, 0);
+  assert.equal(throttled.fakes.redeem.calls.length, 1, "one keyed pass on the WA_REDEEM namespace");
+
+  // Happy paths carry exactly one keyed pass each — per calling worker when
+  // the slug header rides the call, on the token identity otherwise.
+  const stamped = redeemEnv({ changes: 1, user });
+  const stampedOk = await dispatch(
+    redeemRequest("ab".repeat(32), { "X-Relay-Worker": "wempos-forum" }),
+    stamped,
+  );
+  assert.equal(stampedOk.status, 200);
+  assert.equal(stamped.fakes.redeem.calls.length, 1);
+
+  const unstamped = redeemEnv({ changes: 1, user });
+  const unstampedOk = await dispatch(redeemRequest("ab".repeat(32)), unstamped);
+  assert.equal(unstampedOk.status, 200);
+  assert.equal(unstamped.fakes.redeem.calls.length, 1);
 });
 
 test("the guard refusing (expired OR already-redeemed OR unknown code) is the shared 410 — and the identity is never read", async () => {
