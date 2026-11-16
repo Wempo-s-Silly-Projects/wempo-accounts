@@ -6,7 +6,16 @@ export const RATE_LIMIT_BINDINGS = Object.freeze({
   login: "WA_LOGIN_RATE_LIMITER",
   register: "WA_REGISTER_RATE_LIMITER",
   totp: "WA_TOTP_RATE_LIMITER",
+  // The account-management password-change lane (api/manage.mjs): a
+  // credential-weight class on its own strict tier, like login — the
+  // IP pass then the account pass answer BEFORE any relay call.
+  password: "WA_PASSWORD_RATE_LIMITER",
   read: "WA_READ_RATE_LIMITER",
+  // The SSO redeem lane (api/sso.mjs): on the service-binding leg no browser
+  // IP exists, so the caller keys the bucket on the validated relay/worker
+  // identity (the sso.mjs call site) — one throttle tier for every hit of
+  // the D1 write+read the redeem is.
+  redeem: "WA_REDEEM_RATE_LIMITER",
   write: "WA_WRITE_RATE_LIMITER",
 });
 

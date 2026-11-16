@@ -88,6 +88,15 @@ async function handleRedeemRoute(request, env) {
     throw new HttpError(401, "Relay refused.");
   }
 
+  // The limiter pass (audit finding: the only unthrottled /api route). The
+  // service-binding lane has no browser IP to key a bucket on — the member
+  // worker's fetch carries none — so the bucket keys on the validated relay
+  // identity instead: the calling worker's plain-slug stamp when it carries
+  // one, otherwise the (just token-gated, constant-time-validated) token —
+  // rateLimit hashes it, and neither value rides an answer or a log.
+  const stamp = redeemStamp(request);
+  await rateLimit(request, env, "redeem", stamp === "unknown" ? "relay:" + presented : "worker:" + stamp);
+
   const body = await readJson(request);
   const rawCode = typeof body.code === "string" ? body.code : "";
   const code = rawCode.trim().toLowerCase();
@@ -106,7 +115,7 @@ async function handleRedeemRoute(request, env) {
   const redeem = await env.GOOBER_DB.prepare(
     "UPDATE wa_login_tickets SET redeemed_at = ?, redeemed_by = ? " +
       "WHERE code_hash = ? AND redeemed_at IS NULL AND expires_at > ?",
-  ).bind(now, redeemStamp(request), codeHash, now).run();
+  ).bind(now, stamp, codeHash, now).run();
   if (Number(redeem && redeem.meta && redeem.meta.changes) !== 1) {
     throw new HttpError(410, TICKET_GONE);
   }

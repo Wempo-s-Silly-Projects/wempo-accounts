@@ -302,6 +302,72 @@ main {
   margin: 0 0 0.25rem;
 }
 
+/* Account management (the signed-in view): the identity, password-change and
+   sessions cards reuse .auth-card; the extra bits are this block only. */
+.auth-card h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+  color: var(--green-title);
+}
+
+.form-status {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 2px solid var(--green);
+  border-radius: 0.4rem;
+  background: var(--soft-green);
+  color: var(--success-ink);
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border: 2px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--field);
+}
+
+.session-when {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.button-small {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.signout-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 1.1rem;
+}
+
+/* Text-styled buttons (the login/register swap + the page's quiet actions). */
+button.link-button {
+  background: none;
+  border: 0;
+  padding: 0.2rem 0.4rem;
+  color: var(--link);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.link-button:hover {
+  color: var(--link-hover);
+}
+
 .role-chip {
   display: inline-block;
   padding: 0.05rem 0.5rem;

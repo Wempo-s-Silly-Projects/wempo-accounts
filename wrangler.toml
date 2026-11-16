@@ -53,11 +53,34 @@ namespace_id = "614202610144102"
 limit = 10
 period = 60
 
+# Account management (the signed-in page's password-change lane): the two
+# relay legs are the same credential weight as login, so they ride their own
+# strict tier — handlers make an IP pass then an account pass, both BEFORE
+# any relay call (api/manage.mjs).
+[[ratelimits]]
+name = "WA_PASSWORD_RATE_LIMITER"
+namespace_id = "614202610144106"
+[ratelimits.simple]
+limit = 10
+period = 60
+
 [[ratelimits]]
 name = "WA_READ_RATE_LIMITER"
 namespace_id = "614202610144103"
 [ratelimits.simple]
 limit = 180
+period = 60
+
+# The SSO redeem lane (api/sso.mjs): the service-binding leg carries no
+# browser IP, so the throttle keys on the validated relay/worker identity —
+# one bucket per calling worker (or the token when no slug header rides the
+# call). Every redeem is a D1 UPDATE + SELECT, so this lane gets its own
+# tier instead of riding the read limiter.
+[[ratelimits]]
+name = "WA_REDEEM_RATE_LIMITER"
+namespace_id = "614202610144107"
+[ratelimits.simple]
+limit = 30
 period = 60
 
 [[ratelimits]]

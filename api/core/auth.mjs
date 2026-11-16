@@ -8,7 +8,7 @@
 // profile columns). Forum users rows are read here by contract; the
 // credential work itself never happens on this worker.
 import { SESSION_COOKIE, SESSION_TTL_SECONDS } from "../../constants.mjs";
-import { equalConstantTime, nowSeconds, randomToken, sha256Hex } from "./crypto.mjs";
+import { equalConstantTime, hex, nowSeconds, randomToken, sha256Hex } from "./crypto.mjs";
 import { HttpError } from "./http.mjs";
 import { publicRole } from "./roles.mjs";
 
@@ -56,12 +56,16 @@ export async function readSession(request, env) {
   if (!token || !/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
   const tokenHash = await sha256Hex(token);
   const row = await env.GOOBER_DB.prepare(
-    "SELECT s.token_hash, s.user_id, s.csrf_token, s.expires_at, " +
+    "SELECT s.session_id, s.token_hash, s.user_id, s.csrf_token, s.expires_at, " +
       "u.username, u.role, u.totp_enabled " +
       "FROM wa_sso_sessions s LEFT JOIN users u ON u.id = s.user_id " +
       "WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1",
   ).bind(tokenHash, nowSeconds()).first();
   if (!row) return null;
+
+  // The non-secret per-row id (migration 0002): the sessions-management
+  // answer's identity — never the token, never its hash.
+  const sessionId = row.session_id == null ? null : String(row.session_id);
 
   let user = null;
   if (row.user_id !== null && row.username !== null) {
@@ -72,18 +76,23 @@ export async function readSession(request, env) {
       totpEnabled: Number(row.totp_enabled) === 1,
     };
   }
-  return { tokenHash: row.token_hash, csrfToken: row.csrf_token, expiresAt: Number(row.expires_at), user };
+  return { tokenHash: row.token_hash, sessionId, csrfToken: row.csrf_token, expiresAt: Number(row.expires_at), user };
 }
 
 export async function createSession(request, env, userId) {
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
   const csrfToken = randomToken(24);
+  // The row's non-secret id (migration 0002): what the account-management
+  // page sees in its sessions list and what one-row revoke is keyed on. It
+  // identifies, never authenticates — the revocation reads also bind user_id
+  // to the CALLING session, and the raw token/hash stay worker-side.
+  const sessionId = hex(crypto.getRandomValues(new Uint8Array(16)));
   const now = nowSeconds();
   const expiresAt = now + SESSION_TTL_SECONDS;
   await env.GOOBER_DB.prepare(
-    "INSERT INTO wa_sso_sessions (token_hash, user_id, csrf_token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-  ).bind(tokenHash, Number(userId), csrfToken, now, expiresAt).run();
+    "INSERT INTO wa_sso_sessions (token_hash, user_id, csrf_token, session_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).bind(tokenHash, Number(userId), csrfToken, sessionId, now, expiresAt).run();
   // Housekeeping as a write to Accounts' OWN table only: expired rows leave.
   await env.GOOBER_DB.prepare("DELETE FROM wa_sso_sessions WHERE expires_at <= ?").bind(now).run();
   return { tokenHash, csrfToken, setCookie: setCookie(request, token) };

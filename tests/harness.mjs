@@ -34,7 +34,8 @@ export function fakeDb(routes) {
       };
       statement.all = async () => {
         executed.push({ sql, bound: statement.bound });
-        return { results: [] };
+        const route = find(sql);
+        return route && route.all ? { results: await route.all(statement.bound) } : { results: [] };
       };
       return statement;
     },
@@ -63,7 +64,7 @@ export function fakeLimiter(fail = false) {
 export function limiters(fails = {}) {
   const env = {};
   const fakes = {};
-  for (const name of ["LOGIN", "REGISTER", "TOTP", "READ", "WRITE"]) {
+  for (const name of ["LOGIN", "REGISTER", "PASSWORD", "REDEEM", "TOTP", "READ", "WRITE"]) {
     const fake = fakeLimiter(Boolean(fails[name.toLowerCase()]));
     env["WA_" + name + "_RATE_LIMITER"] = fake;
     fakes[name.toLowerCase()] = fake;
@@ -128,6 +129,51 @@ export function loginRequest(body, overrides = {}) {
 
 export async function dispatch(request, env) {
   return worker.fetch(request, env, undefined);
+}
+
+// The credential-relay FORUM_WORKER fake (the mock binding, relay.test.mjs's
+// shape): canned answers for the two relay verbs the accounts client calls —
+// password-verify (whose verdict `verify` flips to { valid: false }) and
+// password-set (`set` false answers the forum's own 400). `fail` throws like
+// an unreachable edge. `imposter` answers a VALID password with the WRONG
+// user payload, for the strict-validation pin. Calls are recorded so tests
+// can pin "no relay call happened" and the exact leg order.
+export function relayWorker({ verify = true, set = true, fail = false, imposter = false, token = "relay-test-token" } = {}) {
+  const calls = [];
+  return {
+    calls,
+    token,
+    async fetch(request) {
+      const body = await request.clone().json();
+      calls.push({ url: request.url, headers: request.headers, body });
+      if (fail) throw new Error("edge down");
+      if (request.headers.get("X-Relay-Token") !== token) {
+        return new Response(JSON.stringify({ error: "Relay refused." }), { status: 403 });
+      }
+      const path = new URL(request.url).pathname;
+      if (path === "/api/relay/password-set") {
+        if (!set) {
+          return new Response(JSON.stringify({ error: "Enter a username and a valid password." }), { status: 400 });
+        }
+        return new Response(
+          JSON.stringify({ changed: true, user: { id: body.username === "wempos" ? 7 : 99, username: body.username } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (path === "/api/relay/password-verify") {
+        if (!verify) return new Response(JSON.stringify({ valid: false }), { status: 200 });
+        return new Response(
+          JSON.stringify(
+            imposter
+              ? { valid: true, user: { id: 99, username: "imposter" } }
+              : { valid: true, user: { id: 7, username: "wempos" } },
+          ),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ valid: false }), { status: 200 });
+    },
+  };
 }
 
 export { ORIGIN, sha256Hex, nowSeconds };

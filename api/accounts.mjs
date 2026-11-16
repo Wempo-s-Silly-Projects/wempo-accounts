@@ -24,6 +24,7 @@ import { userByUsernameKey, publicUser } from "./core/auth.mjs";
 import { relayVerify } from "./relay.mjs";
 import { handleRegisterRoute } from "./register.mjs";
 import { handleSsoRoutes } from "./sso.mjs";
+import { handleManageRoutes } from "./manage.mjs";
 import { isValidUsername } from "./usernames.mjs";
 
 // Test seam (the GooberCord pattern): real deployments always run the
@@ -141,5 +142,9 @@ export async function handleAccountRoutes(request, env, url, path, method, ctx) 
   }
   const ssoRoute = await handleSsoRoutes(request, env, path, method);
   if (ssoRoute) return ssoRoute;
+  // The account-management routes (the signed-in page's lanes: the relayed
+  // password change + the wa_sso_sessions revocation lane) live in manage.mjs.
+  const manageRoute = await handleManageRoutes(request, env, path, method);
+  if (manageRoute) return manageRoute;
   return undefined;
 }
