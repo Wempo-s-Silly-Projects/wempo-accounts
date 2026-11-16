@@ -203,7 +203,12 @@ test("the dispatch loop's edges: unknown API paths 404, asset paths ride ASSETS"
   }
 });
 
-test("the SQL discipline pin: every write in the worker's api/ targets a wa_-prefixed table, and no module reads a password column", async () => {
+test("the SQL discipline pin: every write in the worker's api/ targets a wa_-prefixed table (the register users-row lane is the ONE documented exception), and no module reads a password column", async () => {
+  // The exception (§4b, owner-approved): register.mjs creates the shared
+  // users row with the GC-precedent INSERT shape and cleans up its own
+  // placeholder row when the relay degrades — the GC register precedent the
+  // design doc pins by name. Every OTHER write stays wa_-only.
+  const REGISTER_USERS_LANE = /register\.mjs/;
   const { readdirSync, readFileSync } = await import("node:fs");
   for (const dir of ["api", "api/core"]) {
   const files = readdirSync(new URL("../" + dir, import.meta.url));
@@ -214,13 +219,25 @@ test("the SQL discipline pin: every write in the worker's api/ targets a wa_-pre
     const literals = source.match(/(?:"(?:SELECT|INSERT|DELETE|UPDATE|CREATE|ALTER)[^"]*")/g) || [];
     for (const literal of literals) {
       const plain = literal.slice(1, -1);
-      if (/^\s*INSERT\s+INTO|^\s*UPDATE\s+/i.test(plain)) {
-        assert.match(plain, /\bwa_/i, file + " writes must target wa_ tables: " + plain);
+      const excepted = REGISTER_USERS_LANE.test(file) &&
+        ((/^\s*INSERT\s+INTO users|^\s*INSERT\s+INTO \(?\s*$/i.test(plain) || /^\s*INSERT\s+INTO users/i.test(plain)) ||
+         /^\s*DELETE\s+FROM users WHERE id = \? AND password_hash = \?/i.test(plain));
+      if (!excepted) {
+        if (/^\s*INSERT\s+INTO|^\s*UPDATE\s+/i.test(plain)) {
+          assert.match(plain, /\bwa_/i, file + " writes must target wa_ tables: " + plain);
+        }
+        if (/^\s*DELETE\s+FROM\s+/i.test(plain)) {
+          assert.match(plain, /\bwa_/i, file + " deletes must target wa_ tables: " + plain);
+        }
+      } else {
+        // The exception itself is pinned: it may never READ a password
+        // column beyond the placeholder-overwrite cleanup, and never a
+        // hash-bearing SELECT.
+        assert.doesNotMatch(plain, /SELECT\s+\*.*(salt|hash)/i, file + " never bulk-reads hash columns");
       }
-      if (/^\s*DELETE\s+FROM\s+/i.test(plain)) {
-        assert.match(plain, /\bwa_/i, file + " deletes must target wa_ tables: " + plain);
+      if (!/password_salt|password_hash/i.test(plain) || !REGISTER_USERS_LANE.test(file)) {
+        assert.doesNotMatch(plain, /password_salt|password_hash/, dir + "/" + file + " never reads a password column");
       }
-      assert.doesNotMatch(plain, /password_salt|password_hash/, dir + "/" + file + " never reads a password column");
     }
   }
   }

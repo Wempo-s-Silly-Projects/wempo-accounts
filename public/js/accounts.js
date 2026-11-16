@@ -187,6 +187,99 @@ function loginView() {
   return form;
 }
 
+// --- the Make Account form (§4b) -------------------------------------------------
+
+function registerView() {
+  const error = el("p", { class: "form-error", hidden: "hidden" });
+  const username = el("input", {
+    type: "text",
+    name: "username",
+    autocomplete: "username",
+    required: "required",
+    maxlength: "24",
+    spellcheck: "false",
+    "aria-label": "Wempo Account username",
+  });
+  const password = el("input", {
+    type: "password",
+    name: "password",
+    autocomplete: "new-password",
+    required: "required",
+    minlength: "12",
+    maxlength: "128",
+    "aria-label": "Password",
+  });
+  const submit = el("button", { type: "submit", class: "button", text: "Make Account" });
+  const note = el("p", {
+    class: "form-note",
+    text: "12–128 characters. The same Wempo Account signs you into every Wempo project.",
+  });
+  const switchToSignIn = el("button", {
+    type: "button",
+    class: "link-button",
+    text: "Already have a Wempo Account? Sign in",
+  });
+  switchToSignIn.addEventListener("click", () => renderLogin());
+
+  const heading = el("h1", { text: "Make a Wempo Account" });
+  const tagline = el("p", { class: "tagline", text: "One account for Wempo's projects." });
+  const form = el(
+    "form",
+    { class: "auth-card", novalidate: "novalidate" },
+    heading,
+    tagline,
+    el("div", { class: "form-field" }, el("label", { text: "Username" }), username),
+    el("div", { class: "form-field" }, el("label", { text: "Password" }), password, note),
+    error,
+    submit,
+    el("p", { class: "form-swap" }, switchToSignIn),
+  );
+  addTurnstileSlot(form, "register");
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (signingIn) return;
+    error.hidden = true;
+    let turnstileToken;
+    try {
+      turnstileToken = takeTurnstileToken(form);
+    } catch (why) {
+      error.textContent = why.message;
+      error.hidden = false;
+      return;
+    }
+    signingIn = true;
+    submit.disabled = true;
+    submit.textContent = "Making your account…";
+    try {
+      const { status, data } = await postJson("/api/register", {
+        username: username.value,
+        password: password.value,
+        "cf-turnstile-response": turnstileToken,
+      });
+      if (status === 201 && data && data.user) {
+        csrfToken = data.csrfToken;
+        finishLogin(data.user); // auto-login + the §2 ticket redirect
+        return;
+      }
+      error.textContent = (data && data.error) || "Account creation failed.";
+      error.hidden = false;
+      renderTurnstileSlots(form).catch(() => {});
+    } catch {
+      error.textContent = "The account service could not be reached. Try again.";
+      error.hidden = false;
+      renderTurnstileSlots(form).catch(() => {});
+    } finally {
+      submit.disabled = false;
+      if (submit.textContent === "Making your account…") submit.textContent = "Make Account";
+      signingIn = false;
+    }
+  });
+
+  renderTurnstileSlots(form).catch(() => {});
+  return form;
+}
+
 // --- the signed-in state --------------------------------------------------------
 
 function signedInFromMe(user) {
@@ -226,8 +319,24 @@ function signedInView(user) {
 // --- the three-way render ---------------------------------------------------------
 
 function renderLogin() {
+  const makeAccount = el("button", {
+    type: "button",
+    class: "link-button",
+    text: "New here? Make a Wempo Account",
+  });
+  makeAccount.addEventListener("click", () => renderRegister());
   app.replaceChildren(
     loginView(),
+    el("p", { class: "form-swap" }, makeAccount),
+    el("p", { class: "theme-note" },
+      el("button", { type: "button", class: "theme-toggle", onclick: toggleTheme, text: "Switch theme" }),
+    ),
+  );
+}
+
+function renderRegister() {
+  app.replaceChildren(
+    registerView(),
     el("p", { class: "theme-note" },
       el("button", { type: "button", class: "theme-toggle", onclick: toggleTheme, text: "Switch theme" }),
     ),
@@ -244,6 +353,27 @@ function renderSignedIn(user) {
 }
 
 async function boot() {
+  // ?signout=1: a member site's sign-out hands the browser here so the
+  // accounts-site session clears too — without it, an existing Accounts
+  // session would auto-ticket straight back through the return flow and the
+  // member could never actually leave. Best-effort; the member then sees
+  // the sign-in form (never the return redirect).
+  if (new URLSearchParams(window.location.search).get("signout")) {
+    try {
+      const me = await fetch("/api/me");
+      if (me.ok) {
+        const data = await me.json();
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: { "X-CSRF-Token": data.csrfToken || "" },
+        });
+      }
+    } catch {
+      /* the member simply keeps the accounts session they came with */
+    }
+    renderLogin();
+    return;
+  }
   // The signed-in read decides the first view; a failed read is just the
   // login form (never an error page — the account home always answers).
   try {

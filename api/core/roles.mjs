@@ -7,6 +7,10 @@
 // api/core/roles.mjs verbatim so both workers render the same identity.
 // WARNING: publicRole is NOT idempotent — publicRole('admin') === 'owner' —
 // so only ever feed it raw DB values.
+export const ROLE_OWNER_DB = "admin";
+export const ROLE_ADMIN_DB = "moderator";
+export const ROLE_MEMBER_DB = "member";
+
 const PUBLIC_ROLE_BY_STORED = { member: "member", moderator: "admin", admin: "owner" };
 
 export function publicRole(value) {

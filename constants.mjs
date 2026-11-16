@@ -4,6 +4,7 @@
 // vendored http.mjs shape reads it), and the phase-2 handshake constants.
 export const RATE_LIMIT_BINDINGS = Object.freeze({
   login: "WA_LOGIN_RATE_LIMITER",
+  register: "WA_REGISTER_RATE_LIMITER",
   totp: "WA_TOTP_RATE_LIMITER",
   read: "WA_READ_RATE_LIMITER",
   write: "WA_WRITE_RATE_LIMITER",

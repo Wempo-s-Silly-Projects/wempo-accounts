@@ -22,6 +22,7 @@ import { HttpError, json, rateLimit, readJson, requireTurnstile, securityHeaders
 import { verifyTotpCode } from "./core/totp.mjs";
 import { userByUsernameKey, publicUser } from "./core/auth.mjs";
 import { relayVerify } from "./relay.mjs";
+import { handleRegisterRoute } from "./register.mjs";
 import { handleSsoRoutes } from "./sso.mjs";
 import { isValidUsername } from "./usernames.mjs";
 
@@ -128,6 +129,9 @@ export async function handleAccountRoutes(request, env, url, path, method, ctx) 
 
   if (path === "/api/login" && method === "POST") {
     return handleLoginRoute(request, env);
+  }
+  if (path === "/api/register" && method === "POST") {
+    return handleRegisterRoute(request, env);
   }
   if (path === "/api/me" && method === "GET") {
     return handleMeRoute(request, env);

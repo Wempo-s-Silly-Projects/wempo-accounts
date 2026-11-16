@@ -36,6 +36,16 @@ namespace_id = "614202610144101"
 limit = 10
 period = 60
 
+# Make Account (§4b): account creation shares login's strict tier — the
+# Turnstile + INSERT + relay sequence is exactly the credential-weight
+# class a fresh account creation is.
+[[ratelimits]]
+name = "WA_REGISTER_RATE_LIMITER"
+namespace_id = "614202610144105"
+[ratelimits.simple]
+limit = 10
+period = 60
+
 [[ratelimits]]
 name = "WA_TOTP_RATE_LIMITER"
 namespace_id = "614202610144102"

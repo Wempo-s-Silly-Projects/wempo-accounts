@@ -3,7 +3,7 @@
 // a dispatch helper that drives Accounts' worker entrypoint exactly as
 // workerd would (same origin, real Response objects — no network).
 import worker from "../worker.mjs";
-import { sha256Hex } from "../api/core/crypto.mjs";
+import { nowSeconds, sha256Hex } from "../api/core/crypto.mjs";
 
 const ORIGIN = "https://accounts.itswempo.workers.dev";
 
@@ -63,7 +63,7 @@ export function fakeLimiter(fail = false) {
 export function limiters(fails = {}) {
   const env = {};
   const fakes = {};
-  for (const name of ["LOGIN", "TOTP", "READ", "WRITE"]) {
+  for (const name of ["LOGIN", "REGISTER", "TOTP", "READ", "WRITE"]) {
     const fake = fakeLimiter(Boolean(fails[name.toLowerCase()]));
     env["WA_" + name + "_RATE_LIMITER"] = fake;
     fakes[name.toLowerCase()] = fake;
@@ -87,13 +87,31 @@ export function usersRow(overrides = {}) {
 }
 
 // The users read routes: identity by username_key, the session join.
-export function dbFor(user = usersRow(), sessionRow = null) {
+export function dbFor(user = usersRow(), sessionRow = null, { filterWords } = {}) {
+  const filteredWords = filterWords instanceof Map ? filterWords : new Map();
   return fakeDb([
     { test: (sql) => sql.includes("FROM users WHERE username_key = ?"),
       first: async () => user },
+    { test: (sql) => sql.includes("FROM users WHERE id = ? LIMIT 1"),
+      first: async (bound) => (Number(bound[0]) === user.id ? user : null) },
+    { test: (sql) => sql.startsWith("INSERT INTO users"),
+      run: async () => ({ changes: 1, last_row_id: user.id }) },
     { test: (sql) => sql.includes("FROM wa_sso_sessions s LEFT JOIN users u"),
       first: async () => sessionRow },
+    // The shared username-filter list (register's read-only site_settings
+    // lookup): an empty desk list applies — the two filter passes are no-ops.
+    { test: (sql) => sql.includes("FROM site_settings WHERE key = ?"),
+      first: async (bound) => (filteredWords.has(String(bound[0])) ?
+        { value: filteredWords.get(String(bound[0])), updated_at: nowSeconds } : null) },
   ]);
+}
+
+export function registerRequest(body, overrides = {}) {
+  return new Request(ORIGIN + "/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: ORIGIN, ...overrides },
+    body: JSON.stringify(body),
+  });
 }
 
 export function loginRequest(body, overrides = {}) {
@@ -112,4 +130,4 @@ export async function dispatch(request, env) {
   return worker.fetch(request, env, undefined);
 }
 
-export { ORIGIN, sha256Hex };
+export { ORIGIN, sha256Hex, nowSeconds };
