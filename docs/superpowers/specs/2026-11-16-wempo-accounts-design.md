@@ -94,6 +94,22 @@ The handshake ships first, then the door-swap rides right after it:
   links, exactly as phase-3's settings will ride them.
 - TOTP and the later settings live at accounts (phase 3).
 
+### Shipped 2026-11-16: the sign-out handoff (the door-swap tail)
+
+The member-site sign-out clears the accounts-site session too: the site's
+logout assigns `https://accounts.itswempo.workers.dev/?signout=1` (deliberately
+no `return` — an existing Accounts session would auto-ticket straight back
+and the member could never actually leave). The page clears the
+`wa_sso_sessions` session best-effort, then shows the sign-in form (never a
+return redirect).
+
+Scope, stated plainly (NOT single sign-out): sign-out at one member site
+ends that site's session plus the Accounts session only — the other site's
+session stays minted. Signing out at the accounts SITE does not
+retroactively clear any member site's session. §2's "sign out everywhere"
+revocation surface (the Account Management session list) remains a phase-3
+item.
+
 ## 4. The rename
 
 - Copy on both platforms: "Wempo Account" everywhere an account is
