@@ -251,7 +251,9 @@ async function boot() {
     if (response.ok) {
       const data = await response.json();
       csrfToken = data.csrfToken;
-      renderSignedIn(data.user);
+      // A member site may send an already-authenticated Accounts session
+      // back here. Complete the same SSO ticket hand-off as a fresh login.
+      await finishLogin(data.user);
       return;
     }
   } catch {
