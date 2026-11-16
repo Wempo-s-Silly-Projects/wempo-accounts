@@ -1,6 +1,6 @@
-// Wempo Accounts login page (phase 1): three states rendered CSP-safe —
-// the login form (+ the 2FA step, an extra field on the SAME form), and the
-// signed-in state (username + role chip + sign out). Everything builds DOM
+// Wempo Accounts login page: states rendered CSP-safe — the login form
+// (+ the 2FA step, an extra field on the SAME form), and the signed-in
+// state (username + role chip + sign out). Everything builds DOM
 // through el() and user data rides textContent only — never innerHTML; no
 // inline styles (the theme toggle writes the data-theme attribute, CSSOM at
 // most). The dialog idiom (self-remove on close) is not needed here: phase 1
@@ -13,6 +13,13 @@ const app = document.getElementById("app");
 // In-memory only — never persisted anywhere; a reload re-reads /api/me.
 let csrfToken = null;
 let signingIn = false;
+
+// The phase-2 handshake's return target: a member who arrived from a site's
+// "Sign in with Wempo Accounts" button carries ?return=<origin>. The page
+// does NOT judge the value (an off-allowlist return just means the plain
+// login page, no error banner) — the server's POST /api/sso/ticket is the
+// sole enforcement point; it answers a redirect only for an allowed origin.
+const ssoReturn = new URLSearchParams(window.location.search).get("return") || null;
 
 // --- theme (dark-first) --------------------------------------------------------
 const THEME_KEY = "wa-theme";
@@ -45,6 +52,31 @@ async function postJson(path, body, headers = {}) {
     data = null;
   }
   return { status: response.status, data };
+}
+
+// --- the signed-in hand-off (the phase-2 return flow) --------------------------
+// Both login paths (single-shot and the TOTP two-step) land here. With a
+// ?return= target: ask the server to mint the one-time ticket and follow the
+// redirect it answers (only ever an allowlisted origin — the server's
+// answer, never the page's own judgment of the parameter). Any ticket
+// failure — no session, a non-allowlisted origin, a network miss — just
+// lands on the plain signed-in view; the member keeps their accounts-site
+// session either way.
+async function finishLogin(user) {
+  if (!ssoReturn) {
+    renderSignedIn(user);
+    return;
+  }
+  try {
+    const { status, data } = await postJson("/api/sso/ticket", { return: ssoReturn });
+    if (status === 200 && data && typeof data.redirect === "string" && data.redirect) {
+      window.location.assign(data.redirect);
+      return;
+    }
+  } catch {
+    /* the ticket service is unreachable → the plain signed-in view */
+  }
+  renderSignedIn(user);
 }
 
 // --- the login form (login + 2FA step on one form) -----------------------------
@@ -121,7 +153,7 @@ function loginView() {
       const { status, data } = await postJson("/api/login", payload);
       if (status === 200 && data && data.user && !data.totpRequired) {
         csrfToken = data.csrfToken;
-        renderSignedIn(data.user);
+        await finishLogin(data.user);
         return;
       }
       if (status === 200 && data && data.totpRequired) {

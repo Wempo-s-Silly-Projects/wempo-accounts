@@ -174,9 +174,10 @@ test("the dispatch loop's edges: unknown API paths 404, asset paths ride ASSETS"
   assert.equal(unknownApi.status, 404);
   assert.deepEqual(await unknownApi.json(), { error: "That API endpoint does not exist." });
 
-  // The phase-2 route space is deliberately absent (no handshake built yet).
-  // /api/tickets + /api/sso answer the dispatch 404; /login is a non-API
-  // path, so it rides ASSETS (whose fake answers 404 for the missing page).
+  // Unrouted paths still answer the dispatch 404 (the built phase-2 routes
+  // are /api/sso/ticket + /api/sso/redeem — anything else does not exist);
+  // /login is a non-API path, so it rides ASSETS (whose fake answers 404
+  // for the missing page).
   for (const path of ["/api/tickets/redeem", "/api/sso/everywhere-signout"]) {
     const response = await dispatch(new Request(ORIGIN + path), env);
     assert.equal(response.status, 404, path + " is not part of phase 1");

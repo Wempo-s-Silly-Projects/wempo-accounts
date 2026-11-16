@@ -22,6 +22,7 @@ import { HttpError, json, rateLimit, readJson, requireTurnstile, securityHeaders
 import { verifyTotpCode } from "./core/totp.mjs";
 import { userByUsernameKey, publicUser } from "./core/auth.mjs";
 import { relayVerify } from "./relay.mjs";
+import { handleSsoRoutes } from "./sso.mjs";
 import { isValidUsername } from "./usernames.mjs";
 
 // Test seam (the GooberCord pattern): real deployments always run the
@@ -119,9 +120,9 @@ async function handleLogoutRoute(request, env) {
 
 export async function handleAccountRoutes(request, env, url, path, method, ctx) {
   // ctx (the worker's execution context) is accepted to complete the
-  // dispatch loop's handler signature; these routes schedule no background
-  // work in phase 1. The /login redirect front door and the ticket routes
-  // are phase 2 (the sign-off's handshake) — deliberately absent here.
+  // dispatch loop's handler signature; these routes schedule no background.
+  // The phase-2 handshake (GET /?return=… is the page's client-side read;
+  // the two POST /api/sso/* routes) lives in sso.mjs.
   void url;
   void ctx;
 
@@ -134,5 +135,7 @@ export async function handleAccountRoutes(request, env, url, path, method, ctx) 
   if (path === "/api/logout" && method === "POST") {
     return handleLogoutRoute(request, env);
   }
+  const ssoRoute = await handleSsoRoutes(request, env, path, method);
+  if (ssoRoute) return ssoRoute;
   return undefined;
 }

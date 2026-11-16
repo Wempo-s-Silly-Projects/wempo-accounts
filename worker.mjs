@@ -1,10 +1,12 @@
-// Wempo Accounts (phase 1: scaffold + login) — worker entrypoint. All
-// handler logic lives under api/; worker.mjs owns only the dispatch loop:
-//   /api/* → the Accounts routes (login, me, logout)
+// Wempo Accounts — worker entrypoint. All handler logic lives under api/;
+// worker.mjs owns only the dispatch loop:
+//   /api/* → the Accounts routes (login, me, logout + the phase-2 handshake
+//            routes: POST /api/sso/ticket for the browser's return flow,
+//            POST /api/sso/redeem for the member sites' service bindings)
 //   else   → the ASSETS binding (the login page; run_worker_first, so the
 //            page still rides the security-header wrapper below)
-// The phase-2 handshake (GET /login?return=…, the ticket routes, the
-// sign-out-everywhere lane) is deliberately NOT built here.
+// The sign-out-everywhere lane (revoking tickets + the SSO session) is the
+// handshake's remaining piece, phase 3.
 import { handleAccountRoutes } from "./api/accounts.mjs";
 import { HttpError, json, rateLimit, securityHeaders } from "./api/core/http.mjs";
 
