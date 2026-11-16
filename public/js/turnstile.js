@@ -5,7 +5,7 @@
 // owner mints a Turnstile widget for accounts.itswempo.workers.dev
 // (TURNSTILE_HOSTNAMES in wrangler.toml) and pastes its sitekey here; an
 // empty string keeps the widget unrendered (the server stays fail-closed).
-const TURNSTILE_SITEKEY = "";
+const TURNSTILE_SITEKEY = "0x4AAAAAAFXrK9dxFMt6fp46";
 const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
 const widgets = new Map();
