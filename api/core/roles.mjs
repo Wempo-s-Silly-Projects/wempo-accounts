@@ -1,0 +1,14 @@
+// Role tiers (the forum's v3.1 rename): the PUBLIC vocabulary is member /
+// admin / owner, but users.role stores the PRE-RENAME values — 'moderator'
+// is the admin tier and 'admin' is the owner tier. D1 cannot alter the CHECK
+// constraint short of rebuilding every table that references users, so the
+// stored vocabulary is FROZEN and publicRole() is the single map every role
+// value passes through on its way out of SQL. Vendored from GooberCord's
+// api/core/roles.mjs verbatim so both workers render the same identity.
+// WARNING: publicRole is NOT idempotent — publicRole('admin') === 'owner' —
+// so only ever feed it raw DB values.
+const PUBLIC_ROLE_BY_STORED = { member: "member", moderator: "admin", admin: "owner" };
+
+export function publicRole(value) {
+  return PUBLIC_ROLE_BY_STORED[value] || value;
+}

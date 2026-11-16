@@ -1,0 +1,340 @@
+/* Wempo Accounts — page CSS. The token blocks below are PROJECT FRONTLOAD's
+   warm-paper tokens (copied from GooberCord's public/styles.css, both
+   blocks, values verbatim); everything past them is this page's small
+   layout only. Dark-first: the DARK block is the :root default, a manual
+   [data-theme="light"] flips to the light block, and [data-theme="dark"]
+   re-states the default so a toggle never has to guess. */
+:root {
+  color-scheme: dark;
+  /* Corner style: round by default; [data-corners="square"] flips it. */
+  --button-radius: 0.45rem 0.65rem 0.4rem 0.55rem;
+  accent-color: var(--green);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--desk);
+  font-synthesis: none;
+  /* Cool "night slate": identity accents (mustard, green, coral) stay
+     bright so --on-yellow labels and white button text stay readable. */
+  --paper: #1d2836;
+  --paper-shadow: #0c1219;
+  --desk: #131b27;
+  --desk-dot: #26344a;
+  --ink: #e8e4d8;
+  --muted: #a4aeba;
+  --line: #3d4d61;
+  --green: #378255;
+  --green-dark: #2d6543;
+  --coral: #c45744;
+  --yellow: #f3cf67;
+  --blue: #2a3d52;
+  --focus: #8ab6ff;
+  --link: #7fd0a2;
+  --link-hover: #f0a893;
+  --field: #232f40;
+  --field-line: #4e5e74;
+  --green-title: #d7ecd9;
+  --green-ink: #c9e4cd;
+  --soft-green: #253c30;
+  --yellow-hover: #d8b74a;
+  --coral-dark: #a03d2c;
+  --error-ink: #f4b0a4;
+  --error-soft: #41201f;
+  --success-ink: #8ecfab;
+  --on-yellow: #33240d;
+  --quiet-hover: #31404f;
+  --font-stack: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+/* The light theme rides beside it (the apps' arrangement — a manual choice
+   through [data-theme], values duplicated between the blocks by design). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --paper: #fffaf0;
+  --paper-shadow: #e5d7bc;
+  --ink: #24364a;
+  --muted: #586777;
+  --line: #cbbd9f;
+  --green: #397357;
+  --green-dark: #28583f;
+  --coral: #c65343;
+  --yellow: #f3cf67;
+  --blue: #c8e2e9;
+  --focus: #0758c9;
+  --desk: #f7efdc;
+  --desk-dot: #cfbf9c;
+  --link: #245f49;
+  --link-hover: #8b382e;
+  --field: #fffdf8;
+  --field-line: #9a9d82;
+  --green-title: #2d573f;
+  --green-ink: #334a3a;
+  --soft-green: #e7efd9;
+  --yellow-hover: #e9d9a7;
+  --coral-dark: #9c4035;
+  --error-ink: #842f27;
+  --error-soft: #f5d5c5;
+  --success-ink: #215b41;
+  --on-yellow: #24364a;
+  --quiet-hover: #e9d9a7;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #1d2836;
+  --paper-shadow: #0c1219;
+  --desk: #131b27;
+  --desk-dot: #26344a;
+  --ink: #e8e4d8;
+  --muted: #a4aeba;
+  --line: #3d4d61;
+  --green: #378255;
+  --green-dark: #2d6543;
+  --coral: #c45744;
+  --yellow: #f3cf67;
+  --blue: #2a3d52;
+  --focus: #8ab6ff;
+  --link: #7fd0a2;
+  --link-hover: #f0a893;
+  --field: #232f40;
+  --field-line: #4e5e74;
+  --green-title: #d7ecd9;
+  --green-ink: #c9e4cd;
+  --soft-green: #253c30;
+  --yellow-hover: #d8b74a;
+  --coral-dark: #a03d2c;
+  --error-ink: #f4b0a4;
+  --error-soft: #41201f;
+  --success-ink: #8ecfab;
+  --on-yellow: #33240d;
+  --quiet-hover: #31404f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  background-color: var(--desk);
+  background-image: radial-gradient(var(--desk-dot) 0.6px, transparent 0.6px);
+  background-size: 12px 12px;
+  line-height: 1.6;
+  font-family: var(--font-stack);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--link-hover);
+}
+
+:where(a, button, input):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* The shell: a dashed header band with blaxel in his welcome role, and #app
+   as a COLUMN FLEX CHILD so the auth card centers on every viewport (the
+   GC fix — the card must not ride the page-level flex row). */
+.site-header {
+  border-bottom: 3px dashed var(--line);
+  background: var(--paper);
+}
+
+.header-inner {
+  width: min(100% - 2rem, 1120px);
+  min-height: 76px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--ink);
+  border-radius: 0.4rem;
+  display: block;
+}
+
+.brand-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#app {
+  width: min(100% - 2rem, 430px);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-card {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 0.6rem;
+  box-shadow: 0 4px 0 var(--paper-shadow);
+  padding: 1.5rem;
+}
+
+.auth-card h1 {
+  font-size: 1.45rem;
+  margin: 0 0 0.25rem;
+  color: var(--green-title);
+}
+
+.auth-card .tagline {
+  color: var(--muted);
+  margin: 0 0 1.25rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+
+.form-field label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.form-field input {
+  padding: 0.55rem 0.7rem;
+  border: 2px solid var(--field-line);
+  border-radius: 0.4rem;
+  background: var(--field);
+  color: var(--ink);
+}
+
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.button {
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--button-radius);
+  background: var(--green-dark);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--green);
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.button-quiet {
+  background: var(--yellow);
+  color: var(--on-yellow);
+}
+
+.button-quiet:hover {
+  background: var(--yellow-hover);
+}
+
+.button[disabled] {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.form-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.form-error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 2px solid var(--coral);
+  border-radius: 0.4rem;
+  background: var(--error-soft);
+  color: var(--error-ink);
+}
+
+.signed-in-user {
+  font-size: 1.05rem;
+  margin: 0 0 0.25rem;
+}
+
+.role-chip {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--soft-green);
+  color: var(--green-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.turnstile-slot {
+  margin-bottom: 0.4rem;
+  min-height: 1rem;
+}
+
+.theme-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+button.theme-toggle {
+  background: none;
+  border: 0;
+  padding: 0.2rem 0.4rem;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+button.theme-toggle:hover {
+  color: var(--ink);
+}
