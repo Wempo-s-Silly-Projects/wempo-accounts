@@ -110,6 +110,22 @@ retroactively clear any member site's session. §2's "sign out everywhere"
 revocation surface (the Account Management session list) remains a phase-3
 item.
 
+### 2026-11-16 audit findings (fixes in flight)
+
+Findings from the peer handshake audit, all open at the time of writing:
+
+- The signed-in arrival lane auto-tickets straight back through the
+  return flow, so a site redirecting an authenticated session at accounts
+  can bounce. Fix (backend-dev): auto-ticket only on own-login arrivals.
+- The redeem route accepts relay auth with no rate limiter on top — an
+  uplift is planned so guessing cost grows past the one-time-ticket
+  design.
+- The sites' clients need a refusal card: a persistent refusal should
+  show its copy instead of looping the redirect. Frontend build item.
+- Sign-out-everywhere moved up in priority (phase-3 build): per-site
+  sessions currently outlive an Accounts-only sign-out, as the scope note
+  above already states.
+
 ## 4. The rename
 
 - Copy on both platforms: "Wempo Account" everywhere an account is
