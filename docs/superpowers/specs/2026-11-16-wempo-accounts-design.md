@@ -73,6 +73,27 @@ job (the existing relay contract via Project Experience gains only the
 two relay routes accounts needs: verify + 2FA-state read — no new secret
 paths, no printed secrets, ever).
 
+## 4b. AMENDED FLOW (owner, mid-phase-2, Nov 16 2026 — the doors swap fully)
+
+The handshake ships first, then the door-swap rides right after it:
+
+- GooberCord: NO sign-in page. An unauthenticated open redirects straight
+  to accounts (`?return=` its origin); the ticket returns the member
+  signed-in. The old login route UI is removed.
+- wempos-forum: the Log in / Create account navigations REDIRECT to
+  accounts (still one "click login and it redirects u"); the ?wt ticket
+  still lands the member signed-in. The local auth form's UI is removed.
+- Wempo Accounts gains the CREATE ACCOUNT flow on its own page: username +
+  password (the forum's exact username/password rules), Turnstile, then
+  auto-login (wa_sso_sessions) + the return redirect. The users row is
+  created with the GC-precedent shape (GC's register already inserts
+  shared-db users rows + sets the hash through /api/relay/password-set —
+  accounts does exactly that; NO pepper ever leaves the forum).
+- The sites' own /api/login + /api/register endpoints stay alive as
+  unsupported plumbing (outage escape hatch / API callers) with no UI
+  links, exactly as phase-3's settings will ride them.
+- TOTP and the later settings live at accounts (phase 3).
+
 ## 4. The rename
 
 - Copy on both platforms: "Wempo Account" everywhere an account is
@@ -82,6 +103,13 @@ paths, no printed secrets, ever).
 - GooberCord's login card: "Same forum account" chip becomes "One Wempo
   Account for everything".
 - Visuals: Project Frontload tokens + blaxel in his welcome role.
+
+- The accounts PAGE becomes the whole account world (owner, Nov 16 2026):
+  Sign in · Make Account · Account Management — one page family, three
+  states. Account Management = change password (through the relay), the
+  session list with individual revocation + sign-out-everywhere, and the
+  TOTP enroll/replace step (owner-gated: it writes the forum's TOTP
+  columns, so it ships only with the owner's OK on that write).
 
 ## 5. Build phases
 
