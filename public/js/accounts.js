@@ -23,6 +23,15 @@ let signingIn = false;
 // sole enforcement point; it answers a redirect only for an allowed origin.
 const ssoReturn = new URLSearchParams(window.location.search).get("return") || null;
 
+// The member-site names the continue-back card can speak of (the two known
+// member origins). The ?return value is NEVER trusted with navigation — the
+// server's POST /api/sso/ticket allowlist and its redirect answer are the
+// only gate; this map is a human label and nothing more.
+const SSO_SITE_NAMES = {
+  "https://goobercord.itswempo.workers.dev": "GooberCord",
+  "https://wempos-forum.itswempo.workers.dev": "Wempo Forum",
+};
+
 // --- theme (dark-first) --------------------------------------------------------
 const THEME_KEY = "wa-theme";
 
@@ -556,12 +565,62 @@ function sessionsCard(signedOut) {
   );
 }
 
+// The continue-back card: post-loop-breaker, a plain ?return= arrival with a
+// live session lands HERE (no auto-ticket — the deliberate behavior), so the
+// way back is a visible one-tap instead of a dead end. The button runs the
+// SAME manual ticket flow a fresh login runs (POST /api/sso/ticket → follow
+// the redirect the SERVER answers — never the raw parameter) and the known
+// member origins get their name in the label.
+function continueBackCard() {
+  const siteName = SSO_SITE_NAMES[ssoReturn] || "that site";
+  const goLabel = "Continue to " + siteName;
+  const error = el("p", { class: "form-error", hidden: "hidden" });
+  let busy = false;
+  const go = el("button", { type: "button", class: "button", text: goLabel });
+
+  go.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    go.disabled = true;
+    go.textContent = "Continuing…";
+    error.hidden = true;
+    try {
+      const { status, data } = await postJson("/api/sso/ticket", { return: ssoReturn });
+      if (status === 200 && data && typeof data.redirect === "string" && data.redirect) {
+        window.location.assign(data.redirect); // the SERVER's answer, never the parameter
+        return;
+      }
+      error.textContent =
+        (data && data.error) || "The sign-in hand-off did not go through. Try again.";
+      error.hidden = false;
+    } catch {
+      error.textContent = "The account service could not be reached. Try again.";
+      error.hidden = false;
+    } finally {
+      busy = false;
+      go.disabled = false;
+      go.textContent = goLabel;
+    }
+  });
+
+  return el(
+    "div",
+    { class: "auth-card" },
+    el("h2", { text: siteName === "that site" ? "Continue back" : "Back to " + siteName }),
+    el("p", { class: "form-note", text: "You are already signed in here." }),
+    go,
+    error,
+  );
+}
+
 function signedInView(user) {
   const signedOut = () => {
     csrfToken = null;
     renderLogin();
   };
-  return [identityCard(user), passwordChangeCard(signedOut), sessionsCard(signedOut)];
+  const cards = [identityCard(user), passwordChangeCard(signedOut), sessionsCard(signedOut)];
+  if (ssoReturn) cards.unshift(continueBackCard());
+  return cards;
 }
 
 // --- the three-way render ---------------------------------------------------------
