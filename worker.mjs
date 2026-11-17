@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Wempo Accounts — worker entrypoint. All handler logic lives under api/;
 // worker.mjs owns only the dispatch loop:

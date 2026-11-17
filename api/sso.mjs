@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // The phase-2 handshake (the sign-off's §2): Accounts' side of the redirect
 // flow the member sites drive. Two routes, two lanes, never mixed:

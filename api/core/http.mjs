@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Request/response glue — the typed error, JSON responses, the security-
 // header set, rate limiting, TURNSTILE verification, bounded JSON reading.

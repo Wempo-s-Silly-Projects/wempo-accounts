@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // The Make Account route (§4b): POST /api/register — the accounts front
 // door's create-account lane. The users row is created with the GC-precedent

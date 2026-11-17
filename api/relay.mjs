@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Credential relay client: Accounts' password pepper NEVER exists on this
 // worker — the pepper lives ONLY on the forum worker as a wrangler secret,

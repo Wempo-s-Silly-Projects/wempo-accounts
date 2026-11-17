@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // The phase-2 handshake routes (the Accounts side, the sign-off's §2):
 // POST /api/sso/ticket (the browser's own return flow — same-origin,

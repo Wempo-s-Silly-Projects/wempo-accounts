@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Role tiers (the forum's v3.1 rename): the PUBLIC vocabulary is member /
 // admin / owner, but users.role stores the PRE-RENAME values — 'moderator'

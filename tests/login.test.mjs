@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // POST /api/login — the phase-1 credential path. Pins: relay wiring (the
 // password verdict is the FORUM worker's; a degraded relay fails closed),

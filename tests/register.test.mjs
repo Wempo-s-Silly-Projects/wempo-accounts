@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // POST /api/register — the §4b Make Account lane. Pins: the GC-precedent
 // users-row INSERT with the relay overwriting the hash (a degraded relay

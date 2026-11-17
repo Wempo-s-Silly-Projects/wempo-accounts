@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Relay wiring tests (mock FORUM_WORKER): the credential relay client rides
 // the SAME contract GooberCord's api/relay.mjs established — service-bound

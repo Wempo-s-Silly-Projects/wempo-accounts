@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // The username shape rule shared with GooberCord's api/usernames.mjs (which
 // mirrors the forum's api/core/shapers.mjs character for character): one

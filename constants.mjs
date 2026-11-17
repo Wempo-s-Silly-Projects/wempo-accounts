@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Wempo Accounts constants: the rate-limit scope → binding map (the WA_*
 // limiters in wrangler.toml, ids in a fresh range), the Cloudflare

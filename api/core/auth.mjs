@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Session and identity machinery for the accounts SITE itself: cookie
 // sessions with only SHA-256 token hashes stored (migration 0001's

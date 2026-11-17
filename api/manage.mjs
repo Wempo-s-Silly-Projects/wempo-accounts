@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Account management routes (owner-approved design section "new account
 // management"): the signed-in page's lanes, behind requireCsrf (same-origin +

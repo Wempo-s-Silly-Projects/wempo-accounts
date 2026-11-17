@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Migration 0002 scoping pin: the per-row revocable session_id the account
 // management page's lanes key on. Same STRICT contract as the 0001 pin —

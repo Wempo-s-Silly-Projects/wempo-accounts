@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // [Wempo Accounts vendor] Copied VERBATIM from GooberCord api/filter.mjs so the
 // register front door applies the username filter exactly as its siblings do.

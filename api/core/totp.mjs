@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // TOTP (RFC 6238) — vendored from GooberCord's api/core/totp.mjs verbatim so
 // both workers verify authenticator codes with the SAME module against the

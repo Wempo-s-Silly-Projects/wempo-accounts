@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Migration 0001 scoping pin: the Wempo Accounts phase-1 D1 surface
 // (wa_login_tickets + wa_sso_sessions) on the SHARED wempo-forum-data D1.

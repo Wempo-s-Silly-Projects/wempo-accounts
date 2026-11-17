@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>.
+// see <https://www.gnu.org/licenses/>
 
 // Session machinery: the wempo_account_session cookie ↔ wa_sso_sessions row
 // pair (GET /api/me), the CSRF/same-origin gate on POST /api/logout, and the
