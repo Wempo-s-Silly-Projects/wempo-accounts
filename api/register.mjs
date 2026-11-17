@@ -60,8 +60,14 @@ export async function registerFilterWords(env) {
     if (row) {
       filterCache = { loaded: true, raw: String(row.value ?? ""), at: Date.now() };
     }
-  } catch {
-    /* no site_settings yet: the empty list applies (a strict no-op) */
+  } catch (error) {
+    // No site_settings yet: the empty list applies (a strict no-op — never a
+    // register refusal). The failure itself is worth one line in the logs,
+    // since a silently-empty list also silently skips the word filter.
+    console.warn(
+      "Username-filter site_settings read failed:",
+      error && error.name ? error.name : "UnknownError",
+    );
   }
   return filterCache.loaded ? filterCache.raw : "";
 }
