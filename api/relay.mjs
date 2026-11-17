@@ -33,6 +33,10 @@ async function relayCall(env, path, body) {
     headers: {
       "Content-Type": "application/json",
       "X-Relay-Token": env.RELAY_TOKEN,
+      // The calling worker's convenience stamp: the forum keys its shared
+      // throttle buckets per-worker on this slug. NOT an auth boundary — the
+      // token above is the whole auth; the slug never picks up authority.
+      "X-Relay-Worker": "accounts",
     },
     body: JSON.stringify(body),
   });

@@ -27,7 +27,7 @@ import { assertSameOrigin, readSession } from "./core/auth.mjs";
 import { equalConstantTime, hex, nowSeconds, sha256Hex } from "./core/crypto.mjs";
 import { HttpError, json, rateLimit, readJson } from "./core/http.mjs";
 import { publicRole } from "./core/roles.mjs";
-import { SSO_RETURN_ALLOWLIST, SSO_TICKET_TTL_SECONDS } from "../constants.mjs";
+import { SSO_RETURN_ALLOWLIST, SSO_TICKET_SITE_BY_WORKER, SSO_TICKET_TTL_SECONDS } from "../constants.mjs";
 
 // The ticket code shown to the browser once: 32 bytes of CSPRNG as lowercase
 // hex (the only form it takes anywhere — the table stores its hash alone).
@@ -35,9 +35,16 @@ function randomTicketCode() {
   return hex(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-// The redeem stamp: the calling site's worker name rides an X-Relay-Worker
-// header and is stored ONLY if it is a plain slug — anything else (or an
-// absent header) is just "unknown". Never trusted beyond that shape.
+// The redeem stamp: the calling site's worker announces its identity with a
+// plain-slug X-Relay-Worker header ("goobercord" | "wempos-forum"). The slug
+// is a convenience key, NOT an auth boundary — the constant-time-validated
+// relay token is the whole auth, and the stamp is read only AFTER that
+// validation. Anything else (or an absent header) is "unknown", and an
+// unknown worker redeems nothing: the redeem's WHERE asserts the ticket's
+// own return_site against the origin the slug maps to, so a ticket minted
+// for one member site can never be redeemed at the other (M1: the
+// return_site is enforced, not just written — one leaked ?wt in its 60s
+// window buys exactly one site).
 const redeemStamp = (request) => {
   const name = request.headers.get("X-Relay-Worker") || "";
   return /^[A-Za-z0-9-]{1,64}$/.test(name) ? name : "unknown";
@@ -106,16 +113,26 @@ async function handleRedeemRoute(request, env) {
   if (!/^[0-9a-f]{64}$/.test(code)) {
     throw new HttpError(400, "That sign-in ticket is not valid.");
   }
+  // The declared site: the stamp MUST name one of the two member origins
+  // (the constant-set slug map in constants.mjs). An unknown or absent stamp
+  // establishes nothing — the same shared 410, before any storage question.
+  const declaredSite = SSO_TICKET_SITE_BY_WORKER[stamp] || null;
+  if (!declaredSite) {
+    throw new HttpError(410, TICKET_GONE);
+  }
   const codeHash = await sha256Hex(code);
   const now = nowSeconds();
 
-  // The guarded single statement: a ticket redeems exactly once. The row's
-  // own state (NULL redeemed_at, live expiry) rides the WHERE, so the
-  // changes==1 answer is the only proof either lane ever accepts.
+  // The guarded single statement: a ticket redeems exactly once, BY THE SITE
+  // IT WAS MINTED FOR — the ticket's own return_site rides the WHERE against
+  // the caller's declared origin, so a wrong-worker redeem fails the same
+  // changes!=1 gate an expired/already-redeemed/unknown-code redeem does:
+  // the shared 410, no oracle for which (mismatched tickets are never
+  // spent, and the identity read below runs only after changes==1).
   const redeem = await env.GOOBER_DB.prepare(
     "UPDATE wa_login_tickets SET redeemed_at = ?, redeemed_by = ? " +
-      "WHERE code_hash = ? AND redeemed_at IS NULL AND expires_at > ?",
-  ).bind(now, stamp, codeHash, now).run();
+      "WHERE code_hash = ? AND redeemed_at IS NULL AND expires_at > ? AND return_site = ?",
+  ).bind(now, stamp, codeHash, now, declaredSite).run();
   if (Number(redeem && redeem.meta && redeem.meta.changes) !== 1) {
     throw new HttpError(410, TICKET_GONE);
   }

@@ -40,3 +40,15 @@ export const SSO_RETURN_ALLOWLIST = Object.freeze([
   "https://goobercord.itswempo.workers.dev",
 ]);
 export const SSO_TICKET_TTL_SECONDS = 60;
+
+// The redeem caller's declared identity: the X-Relay-Worker slug maps to the
+// member origin that slug's worker may redeem tickets FOR (api/sso.mjs makes
+// the ticket's own return_site the enforced predicate — one leaked ?wt can
+// never buy both sites). NOT an auth boundary: the relay token validated
+// constant-time is the whole auth, and a slug is trusted only AFTER that.
+// The keys/values must exactly cover SSO_RETURN_ALLOWLIST — a slug that maps
+// to no allowlisted origin redeems nothing (unknown/absent → the shared 410).
+export const SSO_TICKET_SITE_BY_WORKER = Object.freeze({
+  goobercord: "https://goobercord.itswempo.workers.dev",
+  "wempos-forum": "https://wempos-forum.itswempo.workers.dev",
+});
