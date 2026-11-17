@@ -4,10 +4,14 @@
 // every credential question rides the forum worker's token-gated relay
 // (wempos-forum's api/relay.mjs), through a service binding (client copy
 // of GooberCord's api/relay.mjs, the same contract, one new consumer):
-//   relayVerify → "are these credentials correct under the forum pepper?"
-//   relaySet    → "store this new password under the forum pepper" (phase 3:
-//                 the change-password lane — wired, never called, so phase 1
-//                 builds no purchase-size surface ahead of its route)
+//   relayVerify     → "are these credentials correct under the forum pepper?"
+//   relaySet        → "store this new password under the forum pepper" (the
+//                     change-password lane — register pins the contract)
+//   relayRevokeAll  → "sign this user out of every member site" (phase 3:
+//                     ONE user_id-scoped DELETE on the SHARED `sessions`
+//                     table — GC's goober_session and the forum's
+//                     wempo_session hash into the same table — answered with
+//                     a count only, no existence oracle)
 // relayVerify answers REDACTED (ids, usernames, roles — no salt/hash
 // material) and burns the forum's own dummy salt for unknown usernames, so
 // a token holder gets no existence oracle. The token is the whole auth
@@ -72,4 +76,8 @@ export async function relayVerify(env, username, password) {
 
 export async function relaySet(env, username, password) {
   return relayCall(env, "/api/relay/password-set", { username, password });
+}
+
+export async function relayRevokeAll(env, userId) {
+  return relayCall(env, "/api/relay/session-revoke-all", { userId: Number(userId) });
 }

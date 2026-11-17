@@ -5,14 +5,15 @@
 //            POST /api/sso/redeem for the member sites' service bindings)
 //   else   → the ASSETS binding (the login page; run_worker_first, so the
 //            page still rides the security-header wrapper below)
-// The sign-out-everywhere lane (revoking tickets + the SSO session) is the
-// handshake's remaining piece, phase 3.
+// The sign-out-everywhere lane shipped in phase 3: the accounts' own
+// revocation routes (api/manage.mjs) plus the forum's token-gated relay leg
+// for the member sites' shared `sessions` table.
 import { handleAccountRoutes } from "./api/accounts.mjs";
 import { HttpError, json, rateLimit, securityHeaders } from "./api/core/http.mjs";
 
 export { requireTurnstile, rateLimit, readJson } from "./api/core/http.mjs";
 export { createSession } from "./api/core/auth.mjs";
-export { relayVerify, relaySet } from "./api/relay.mjs";
+export { relayVerify, relaySet, relayRevokeAll } from "./api/relay.mjs";
 export { verifyTotpCode, totpAt } from "./api/core/totp.mjs";
 export { isValidUsername } from "./api/usernames.mjs";
 

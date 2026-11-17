@@ -4,8 +4,11 @@
 // limiter tiers BEFORE any relay call), GET /api/sessions (the caller's
 // own rows, hashed tokens never leave the worker, the current one
 // flagged), POST /api/sessions/revoke (the calling row behaves exactly
-// like logout) and POST /api/sessions/revoke-all (everything EXCEPT the
-// calling row). Same fakeDb + pinned-SQL style; the forum fake is
+// like logout) and POST /api/sessions/revoke-all (the TRUE everywhere:
+// the forum relay leg deletes the member sites' shared `sessions` rows
+// FIRST — fail-closed 503 on any degraded answer — then the accounts'
+// own rows go, calling row included, with the still-pending tickets in
+// the same breath). Same fakeDb + pinned-SQL style; the forum fake is
 // harness's relayWorker (the mock FORUM_WORKER binding).
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -320,34 +323,79 @@ function revokeAllRequest(csrfToken, cookieToken) {
   });
 }
 
-test("revoke-all takes every OTHER row for the caller — keyed on the calling hash itself", async () => {
+test("revoke-all is the TRUE everywhere: relay leg FIRST, accounts rows next (calling one included), pending tickets last", async () => {
   const { token, csrfToken, row, headers } = await liveSession();
-  const deletes = [];
-  const env = envForSession(row, relayWorker(), [
+  const order = [];
+  const relay = relayWorker({ revokeAll: 2 });
+  const env = envForSession(row, relay, [
     {
-      test: (sql) => sql.includes("DELETE FROM wa_sso_sessions WHERE user_id = ? AND token_hash <> ?"),
+      test: (sql) => sql.includes("DELETE FROM wa_sso_sessions WHERE user_id = ?") && !sql.includes("token_hash <> ?"),
       run: async (bound) => {
-        deletes.push(bound);
-        return { changes: 2 };
+        order.push("wa_sso_sessions");
+        assert.equal(relay.calls.length, 1, "the member-sites relay leg ran BEFORE any local delete");
+        assert.deepEqual(bound, [7], "user_id alone — no token_hash exemption, the calling row INCLUDED");
+        return { changes: 3 };
       },
+    },
+    {
+      test: (sql) => sql.includes("DELETE FROM wa_login_tickets WHERE user_id = ? AND redeemed_at IS NULL"),
+      run: async (bound) => {
+        order.push("wa_login_tickets");
+        assert.deepEqual(bound, [7], "only the CALLING user's pending tickets");
+        return { changes: 1 };
+      },
+    },
+    // Any OTHER delete statement is a defect — this route never runs one.
+    {
+      test: (sql) => sql.startsWith("DELETE"),
+      run: async () => { throw new Error("an unscoped delete must never run"); },
     },
   ]);
 
   const response = await dispatch(revokeAllRequest(csrfToken, token), env);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { revoked: 2 });
   assert.deepEqual(
-    deletes[0],
-    [7, row.token_hash],
-    "the calling row is exempt by its OWN hash — a hash that rides no answer",
+    await response.json(),
+    { revoked: 3, sites: 2, tickets: 1, signedOut: true },
+    "accounts rows + member-site rows + pending tickets, and the caller signed out",
   );
+  const cookie = response.headers.get("Set-Cookie");
+  assert.match(cookie, /^wempo_account_session=;/);
+  for (const pin of ["Max-Age=0", "HttpOnly", "SameSite=Lax"]) {
+    assert.ok(cookie.includes(pin), "the expired cookie carries " + pin);
+  }
+  // The relay leg: exactly one call, user_id-keyed body, before the locals.
+  assert.equal(relay.calls.length, 1);
+  assert.equal(new URL(relay.calls[0].url).pathname, "/api/relay/session-revoke-all");
+  assert.deepEqual(relay.calls[0].body, { userId: 7 });
+  assert.deepEqual(order, ["wa_sso_sessions", "wa_login_tickets"], "accounts rows, then the ticket sweep");
   void headers;
 });
 
-test("revoke-all is gated like every other management POST (CSRF off → nothing deleted)", async () => {
-  const { row, headers } = await liveSession();
-  const env = envForSession(row, relayWorker(), [
+test("a degraded/refused relay leg fails revoke-all CLOSED (503) — nothing was deleted, no partial success", async () => {
+  const { token, csrfToken, row, headers } = await liveSession();
+  for (const relay of [relayWorker({ fail: true }), relayWorker({ revokeRefuse: true })]) {
+    const env = envForSession(row, relay, [
+      {
+        test: (sql) => sql.startsWith("DELETE"),
+        run: async () => { throw new Error("storage must not be touched"); },
+        first: async () => { throw new Error("storage must not be touched"); },
+      },
+    ]);
+    const response = await dispatch(revokeAllRequest(csrfToken, token), env);
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /Signing out everywhere is temporarily unavailable/);
+    assert.equal(relay.calls.length, 1, "the relay leg was attempted — it just refused");
+    assert.deepEqual(relay.calls[0].body, { userId: 7 });
+  }
+  void headers;
+});
+
+test("revoke-all is gated like every other management POST (CSRF off → no relay call, nothing deleted)", async () => {
+  const { token, row, headers } = await liveSession();
+  const relay = relayWorker();
+  const env = envForSession(row, relay, [
     {
       test: (sql) => sql.startsWith("DELETE"),
       run: async () => { throw new Error("storage must not be touched"); },
@@ -355,5 +403,6 @@ test("revoke-all is gated like every other management POST (CSRF off → nothing
   ]);
   const response = await dispatch(revokeAllRequest("", ""), env);
   assert.ok(response.status === 401 || response.status === 403);
+  assert.equal(relay.calls.length, 0, "the gate answers before any relay leg is attempted");
   void headers;
 });

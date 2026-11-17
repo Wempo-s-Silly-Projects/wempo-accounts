@@ -410,7 +410,7 @@ function sessionsCard(signedOut) {
   });
   const everywhereNote = el("p", {
     class: "form-note",
-    text: "Keeps this browser signed in; every other device gets signed out.",
+    text: "Signs you out of Wempo Accounts AND every member site — this browser included.",
   });
   const signOut = el("button", { type: "button", class: "button button-quiet", text: "Sign out" });
   let loading = false;
@@ -497,22 +497,20 @@ function sessionsCard(signedOut) {
     notice.hidden = true;
     try {
       const { status, data } = await postJson("/api/sessions/revoke-all", {}, csrfHeaders());
-      if (status === 401) {
+      if (status === 401 || (status === 200 && data && data.signedOut)) {
+        // "Everywhere" includes THIS browser — the server expired the cookie
+        // and deleted the calling row, so the page drops to the sign-in form
+        // (the shared calling-session shape).
         signedOut();
         return;
       }
-      if (status === 200 && data && typeof data.revoked === "number") {
-        notice.textContent = data.revoked === 1
-          ? "One other session is signed out."
-          : data.revoked + " other sessions are signed out.";
-        notice.hidden = false;
-      } else {
-        error.textContent = "That didn't go through. Try again.";
-        error.hidden = false;
-      }
-      await load();
+      // Anything else is the fail-closed refusal (shared-toned copy) — the
+      // page keeps its session list and stays usable for another try.
+      error.textContent =
+        (data && data.error) || "That didn't go through. Nothing was signed out — try again.";
+      error.hidden = false;
     } catch {
-      error.textContent = "The account service could not be reached. Try again.";
+      error.textContent = "The account service could not be reached. Nothing was signed out.";
       error.hidden = false;
     } finally {
       armed = false;
@@ -553,7 +551,7 @@ function sessionsCard(signedOut) {
     el("div", { class: "signout-row" }, signOut,
       el("p", {
         class: "form-note",
-        text: "Signing you out of Wempo Accounts only — each member site keeps its own sign-ins.",
+        text: "Sign out signs you out of Wempo Accounts only. Use Sign out everywhere to leave the member sites too.",
       })),
   );
 }

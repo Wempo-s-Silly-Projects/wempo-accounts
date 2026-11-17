@@ -24,9 +24,15 @@
 //     cookie (and tells the page with signedOut: true).
 //
 //   POST /api/sessions/revoke-all
-//     Deletes every row for the caller EXCEPT the calling one (keyed on the
-//     calling token's OWN hash in the WHERE — the raw hash never rides an
-//     answer). Answers only a count.
+//     The TRUE sign-out-everywhere: the member-sites leg runs FIRST through
+//     the forum's token-gated /api/relay/session-revoke-all (GC's
+//     goober_session and the forum's wempo_session share the one `sessions`
+//     table — one user_id-scoped DELETE there signs the member out of every
+//     member site; accounts never writes `sessions` directly), then the
+//     accounts' OWN rows go (the calling one INCLUDED — signedOut: true +
+//     the expired cookie), then every still-pending wa_login_ticket (the
+//     ≤60s re-entry hole). A null/degraded relay answer is a fail-closed
+//     503 with nothing deleted — no partial success, ever.
 //
 // Rate limits: the global write/read tiers run in worker.mjs's dispatch (the
 // logout pattern); the password lane adds its own strict WA_PASSWORD tier as
@@ -35,7 +41,7 @@
 import { expiredCookie, readSession, requireCsrf } from "./core/auth.mjs";
 import { nowSeconds } from "./core/crypto.mjs";
 import { HttpError, json, readJson, rateLimit } from "./core/http.mjs";
-import { relaySet, relayVerify } from "./relay.mjs";
+import { relayRevokeAll, relaySet, relayVerify } from "./relay.mjs";
 
 // The shared fail-closed copy for every relay leg that could not establish
 // its fact (unreachable, refused token, non-ok, a shape we can't trust).
@@ -43,6 +49,13 @@ import { relaySet, relayVerify } from "./relay.mjs";
 const RELAY_UNAVAILABLE =
   "Password changes are temporarily unavailable, so nothing was changed. " +
   "Try again in a moment.";
+
+// The sign-out-everywhere leg's own fail-closed copy (same shared tone, the
+// right fact: NOTHING was deleted if the relay leg could not establish it —
+// no partial success, ever).
+const RELAY_SESSION_UNAVAILABLE =
+  "Signing out everywhere is temporarily unavailable, so nothing was " +
+  "changed. Try again in a moment.";
 
 // The session_id shape mint.ts mints (16 bytes, lowercase hex). A malformed
 // id is a shape 400 before any storage question is asked — sso.mjs's
@@ -174,14 +187,44 @@ async function handleSessionRevokeRoute(request, env) {
 async function handleSessionRevokeAllRoute(request, env) {
   const session = await requireCsrf(request, env);
   if (!session.user) throw new HttpError(401, "Please sign in to do that.");
-  // Every OTHER row for the caller goes, keyed on the calling hash itself in
-  // the WHERE (never an answer, never a comparison the caller could abuse —
-  // the calling session is also requireCsrf's only row).
+  const userId = Number(session.user.id);
+
+  // Leg 0 — the member sites. GC's goober_session and the forum's
+  // wempo_session hash into the SAME `sessions` table on the shared D1, so
+  // the FORUM's token-gated relay route (a single user_id-scoped DELETE)
+  // signs the member out of every member site at once. Accounts never
+  // touches `sessions` directly (the wa_-only discipline stands; the relay
+  // leg is the point). THE RELAY LEG RUNS FIRST and a null/degraded answer
+  // is a fail-closed 503 with NOTHING deleted — a "sign out everywhere"
+  // that only half-worked must never exist: no partial success, ever.
+  const sites = await relayRevokeAll(env, userId);
+  if (!sites || typeof sites.revoked !== "number") {
+    throw new HttpError(503, RELAY_SESSION_UNAVAILABLE);
+  }
+
+  // Leg 1 — the accounts SITE's own rows, the CALLING ONE INCLUDED (the
+  // token_hash <> ? exclusion is gone: "everywhere" is literally true, so
+  // the caller's answer below carries signedOut: true + the expired cookie,
+  // exactly like the calling-row revoke above).
   const result = await env.GOOBER_DB.prepare(
-    "DELETE FROM wa_sso_sessions WHERE user_id = ? AND token_hash <> ?",
-  ).bind(Number(session.user.id), session.tokenHash).run();
+    "DELETE FROM wa_sso_sessions WHERE user_id = ?",
+  ).bind(userId).run();
+
+  // Leg 2 — the handshake's re-entry hole: a minted-but-unredeemed ticket
+  // (up to SSO_TICKET_TTL_SECONDS of life) would let a stale tab hop right
+  // back to a member site AFTER the everywhere press. Those go too —
+  // redeemed ones are already spent, so only the pending lane is deleted.
+  const tickets = await env.GOOBER_DB.prepare(
+    "DELETE FROM wa_login_tickets WHERE user_id = ? AND redeemed_at IS NULL",
+  ).bind(userId).run();
+
   const revoked = Number(result && result.meta && result.meta.changes) || 0;
-  return json({ revoked });
+  const pendingTickets = Number(tickets && tickets.meta && tickets.meta.changes) || 0;
+  // json() rides the security-header set + no-store; the cookie is the
+  // expired one (the calling-row answer's Set-Cookie, manage-shaped).
+  return json({ revoked, sites: sites.revoked, tickets: pendingTickets, signedOut: true }, 200, {
+    "Set-Cookie": expiredCookie(request),
+  });
 }
 
 export async function handleManageRoutes(request, env, path, method) {

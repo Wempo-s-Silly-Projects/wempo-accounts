@@ -132,13 +132,17 @@ export async function dispatch(request, env) {
 }
 
 // The credential-relay FORUM_WORKER fake (the mock binding, relay.test.mjs's
-// shape): canned answers for the two relay verbs the accounts client calls —
-// password-verify (whose verdict `verify` flips to { valid: false }) and
-// password-set (`set` false answers the forum's own 400). `fail` throws like
-// an unreachable edge. `imposter` answers a VALID password with the WRONG
-// user payload, for the strict-validation pin. Calls are recorded so tests
-// can pin "no relay call happened" and the exact leg order.
-export function relayWorker({ verify = true, set = true, fail = false, imposter = false, token = "relay-test-token" } = {}) {
+// shape): canned answers for the three relay verbs the accounts client calls —
+// password-verify (whose verdict `verify` flips to { valid: false }),
+// password-set (`set` false answers the forum's own 400), and
+// session-revoke-all (`revokeAll` answers N member-site sessions removed).
+// `fail` throws like an unreachable edge. `imposter` answers a VALID password
+// with the WRONG user payload, for the strict-validation pin. Calls are
+// recorded so tests can pin "no relay call happened" and the exact leg order.
+export function relayWorker({
+  verify = true, set = true, fail = false, imposter = false,
+  revokeAll = 2, revokeRefuse = false, token = "relay-test-token",
+} = {}) {
   const calls = [];
   return {
     calls,
@@ -168,6 +172,15 @@ export function relayWorker({ verify = true, set = true, fail = false, imposter 
               ? { valid: true, user: { id: 99, username: "imposter" } }
               : { valid: true, user: { id: 7, username: "wempos" } },
           ),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (path === "/api/relay/session-revoke-all") {
+        if (revokeRefuse) {
+          return new Response(JSON.stringify({ error: "Relay refused." }), { status: 403 });
+        }
+        return new Response(
+          JSON.stringify({ revoked: revokeAll }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }

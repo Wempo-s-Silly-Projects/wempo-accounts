@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { relayVerify, relaySet } from "../api/relay.mjs";
+import { relayVerify, relaySet, relayRevokeAll } from "../api/relay.mjs";
 
 const TOKEN = "relay-test-token-abc123";
 
@@ -53,6 +53,15 @@ test("relaySet rides the same lane (the phase-3 password lane, wired today)", as
 
   assert.equal(answer.changed, true);
   assert.equal(new URL(binding.calls[0].url).pathname, "/api/relay/password-set");
+});
+
+test("relayRevokeAll rides the same lane (the true sign-out-everywhere leg, count-only answer)", async () => {
+  const binding = jsonBinding({ revoked: 3 });
+  const answer = await relayRevokeAll(envWith(binding), 7);
+
+  assert.deepEqual(answer, { revoked: 3 });
+  assert.equal(new URL(binding.calls[0].url).pathname, "/api/relay/session-revoke-all");
+  assert.deepEqual(await binding.calls[0].clone().json(), { userId: 7 });
 });
 
 test("an unconfigured RELAY_TOKEN is a null answer with NO subrequest (fail closed)", async () => {
