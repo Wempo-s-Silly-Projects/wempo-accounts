@@ -52,3 +52,5 @@ modified version over a network, you owe your users the source of that
 version (AGPLv3 section 13).
 
 Copyright (C) 2026 ItsWempo
+
+[![Built with Cloudflare](https://workers.cloudflare.com/built-with-cloudflare.svg)](https://cloudflare.com)
