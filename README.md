@@ -1,40 +1,54 @@
 # Wempo Accounts
 
 The unified sign-in site for the Wempo fleet: one login that walks members
-across GooberCord, wempos-forum, and the relay lane, with Turnstile at the
-front door, TOTP as the second factor, and its own wa_-prefixed tables beside
-the shared identity rows. The source, migrations, tests, and deployment
-scripts for the deployed service all live in this repository.
+across GooberCord, Wempo's Forum, and the relay lane, with Turnstile at the
+front door and TOTP as the second factor.
 
-Source: <https://github.com/Wempo-s-Silly-Projects/wempo-accounts>
+- **Live:** <https://accounts.itswempo.workers.dev>
+- **Source:** <https://github.com/Wempo-s-Silly-Projects/wempo-accounts>
+
+Accounts keeps its own `wa_`-prefixed tables beside the shared identity
+rows in one production D1 database. It may create/read/write only
+`wa_`-prefixed tables and reads the forum's users table for identity; every
+password verify/set rides the forum worker's token-gated credential relay,
+so a password hash is written or read only by the forum worker.
+
+## Features
+
+- One session that tickets you into GooberCord and the forum (one-time
+  60-second tickets — only their hashes are ever stored)
+- Sign-in form with Turnstile challenge and optional TOTP step
+- "Make a Wempo Account" lane for new members
+- Manage page: password change and 2FA setup
+- Exact-match origin `return=` allowlist — no open redirects
+
+## Quick start (local dev)
+
+Requirements: Node.js 22 or newer (22/24/26 LTS) and
+[pnpm](https://pnpm.io), which is the only package manager this repo uses.
+
+```bash
+corepack enable pnpm          # skip if you already have pnpm
+pnpm install
+pnpm run dev                  # wrangler dev, local D1 store
+```
+
+Run the tests:
+
+```bash
+pnpm test
+```
+
+Secret bindings (Turnstile keys, the credential-relay token) are
+owner-held; put what you need in a git-ignored `.dev.vars` for local runs —
+never commit it and never print its values.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributing guide.
 
 ## License
 
-Copyright (C) 2026 ItsEempo
+AGPL-3.0-or-later — see the full text in [COPYING](COPYING). If you run a
+modified version over a network, you owe your users the source of that
+version (AGPLv3 section 13).
 
-Wempo Accounts is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-The full license text follows in the COPYING file at the root of this
-repository.
-
-Modified versions that let users interact with them over a network must
-offer those users the corresponding source of the version they are serving
-(GNU Affero General Public License, section 13): a visible link to the
-source archive, or the repository above, satisfies this duty.
-
-Copyright 2026 ItsWempo
-Copying and distribution of this file, with or without modification, are
-permitted in any medium without royalty provided the copyright notice and
-this notice are preserved.  This file is offered as-is, without any
-warranty.
+Copyright (C) 2026 ItsWempo
