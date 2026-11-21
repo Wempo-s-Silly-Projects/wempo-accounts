@@ -1,13 +1,13 @@
 # Wempo Accounts — the one account home for Wempo's projects
 # (docs/superpowers/specs/2026-11-16-wempo-accounts-design.md, phase 1:
-# scaffold + login). The worker NAME is the URL: accounts.itswempo.workers.dev.
+# scaffold + login). The worker NAME is the URL: accounts.wempos-forum.com
 name = "accounts"
 main = "worker.mjs"
 compatibility_date = "2026-10-13"
 workers_dev = true
 
 [vars]
-TURNSTILE_HOSTNAMES = "accounts.itswempo.workers.dev"
+TURNSTILE_HOSTNAMES = "accounts.wempos-forum.com"
 VERSION = "1.0.0"
 
 [assets]
