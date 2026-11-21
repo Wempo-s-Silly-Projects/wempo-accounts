@@ -28,8 +28,7 @@ const ssoReturn = new URLSearchParams(window.location.search).get("return") || n
 // server's POST /api/sso/ticket allowlist and its redirect answer are the
 // only gate; this map is a human label and nothing more.
 const SSO_SITE_NAMES = {
-  "https://goobercord.itswempo.workers.dev": "GooberCord",
-  "https://wempos-forum.itswempo.workers.dev": "Wempo Forum",
+  "https://wempos-forum.com: "Wempo Forum",
 };
 
 // --- theme (dark-first) --------------------------------------------------------
