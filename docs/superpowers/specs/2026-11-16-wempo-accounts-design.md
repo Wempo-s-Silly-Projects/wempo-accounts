@@ -7,7 +7,7 @@ owner-codename-ecosystem: Project Experience (forum API, stays in wempos-forum) 
 
 # Wempo Accounts — one login for everything
 
-`accounts.itswempo.workers.dev` — a dedicated account worker that every Wempo
+`accounts.wempos-forum.com` — a dedicated account worker that every Wempo
 project signs in through. Renames the "same forum account" story into
 **Wempo Accounts** on both platforms. The account database is the SHARED
 wempos-forum `users` table (the owner's explicit call: accounts keeps using
@@ -18,7 +18,7 @@ the wempos-forum database) — no second account registry ever exists.
 - One account home: sign in, sign out, 2FA prompts, and (later) profile-ish
   account settings — under one roof, one URL.
 - "Log into everything": after signing in at accounts, every member site
-  (wempos-forum, GooberCord, future projects) admits you without a second
+  (wempos-forum, future projects) admits you without a second
   login — while each site keeps its own local session and cookie (their
   existing tables, their existing behavior).
 - The credentials stay exactly what they are today: the forum's password
@@ -28,13 +28,12 @@ the wempos-forum database) — no second account registry ever exists.
 ## 2. How cross-site sign-in works (the sign-off decision)
 
 Browsers do not allow one cookie across siblings' subdomains
-(`accounts.itswempo.workers.dev` cannot set a cookie that
-`wempos-forum.itswempo.workers.dev` reads — workers.dev is an eTLD+1
-public-suffix entry; the Domain attribute would be refused). So the clean
+(`accounts.wempos-forumv` cannot set a cookie that
+`wempos-forum.wempos-forum` (formerly, not yet implemented) So the clean
 fit is a redirect handshake, not a shared cookie:
 
 1. A site's "Sign in with Wempo Accounts" button sends the member to
-   `accounts.itswempo.workers.dev/login?return=<site-url>`.
+   `accounts.wempos-forum.com/login?return=<site-url>`.
 2. Accounts authenticates (password + optional TOTP + Turnstile, all with
    the today-rules) and then redirects back with a ONE-TIME ticket code.
 3. The site's worker redeems the ticket — service-binding call to the
@@ -76,19 +75,13 @@ paths, no printed secrets, ever).
 ## 4b. AMENDED FLOW (owner, mid-phase-2, Nov 16 2026 — the doors swap fully)
 
 The handshake ships first, then the door-swap rides right after it:
-
-- GooberCord: NO sign-in page. An unauthenticated open redirects straight
-  to accounts (`?return=` its origin); the ticket returns the member
-  signed-in. The old login route UI is removed.
 - wempos-forum: the Log in / Create account navigations REDIRECT to
   accounts (still one "click login and it redirects u"); the ?wt ticket
   still lands the member signed-in. The local auth form's UI is removed.
 - Wempo Accounts gains the CREATE ACCOUNT flow on its own page: username +
   password (the forum's exact username/password rules), Turnstile, then
   auto-login (wa_sso_sessions) + the return redirect. The users row is
-  created with the GC-precedent shape (GC's register already inserts
-  shared-db users rows + sets the hash through /api/relay/password-set —
-  accounts does exactly that; NO pepper ever leaves the forum).
+  created with the GC-precedent shape.
 - The sites' own /api/login + /api/register endpoints stay alive as
   unsupported plumbing (outage escape hatch / API callers) with no UI
   links, exactly as phase-3's settings will ride them.
@@ -97,7 +90,7 @@ The handshake ships first, then the door-swap rides right after it:
 ### Shipped 2026-11-16: the sign-out handoff (the door-swap tail)
 
 The member-site sign-out clears the accounts-site session too: the site's
-logout assigns `https://accounts.itswempo.workers.dev/?signout=1` (deliberately
+logout assigns `https://accounts.wempos-forum.com/?signout=1` (deliberately
 no `return` — an existing Accounts session would auto-ticket straight back
 and the member could never actually leave). The page clears the
 `wa_sso_sessions` session best-effort, then shows the sign-in form (never a
@@ -132,8 +125,6 @@ Findings from the peer handshake audit, all open at the time of writing:
   described (sign-in screens, register copy, settings).
 - The forum's login route gains the Wempo Accounts front door (same
   fields first; the redirect adds on later, phase 2).
-- GooberCord's login card: "Same forum account" chip becomes "One Wempo
-  Account for everything".
 - Visuals: Project Frontload tokens + blaxel in his welcome role.
 
 - The accounts PAGE becomes the whole account world (owner, Nov 16 2026):
@@ -148,7 +139,7 @@ Findings from the peer handshake audit, all open at the time of writing:
 1. **Scaffold + login** — accounts worker on the shared DB (wa_ tables),
    password login through the forum relay, Turnstile, the page itself.
    Ships dark-first with the light theme beside it like the apps.
-2. **The handshake** — tickets + forum/GC "Sign in with Wempo Accounts"
+2. **The handshake** — tickets + forum "Sign in with Wempo Accounts"
    buttons + sign-out-everywhere; the rename lands with this phase.
 3. **Account settings** — change password (through the relay), sessions
    view, 2FA enroll/replace where the forum already has the primitives.
