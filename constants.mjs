@@ -54,8 +54,7 @@ export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 // pattern). SSO_TICKET_TTL_SECONDS caps the one-time ticket's life: a
 // `wa_login_tickets` row's expires_at is at most this many seconds past mint.
 export const SSO_RETURN_ALLOWLIST = Object.freeze([
-  "https://wempos-forum.itswempo.workers.dev",
-  "https://goobercord.itswempo.workers.dev",
+  "https://wempos-forum.com",
 ]);
 export const SSO_TICKET_TTL_SECONDS = 60;
 
@@ -67,6 +66,5 @@ export const SSO_TICKET_TTL_SECONDS = 60;
 // The keys/values must exactly cover SSO_RETURN_ALLOWLIST — a slug that maps
 // to no allowlisted origin redeems nothing (unknown/absent → the shared 410).
 export const SSO_TICKET_SITE_BY_WORKER = Object.freeze({
-  goobercord: "https://goobercord.itswempo.workers.dev",
-  "wempos-forum": "https://wempos-forum.itswempo.workers.dev",
+  "wempos-forum": "https://wempos-forum.com",
 });
