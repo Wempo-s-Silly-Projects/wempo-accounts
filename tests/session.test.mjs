@@ -49,7 +49,7 @@ function limitStub() {
 
 function envFor(sessionRow = null) {
   return {
-    GOOBER_DB: fakeDb([
+    FORUM_DB: fakeDb([
       {
         test: (sql) => sql.includes("FROM wa_sso_sessions s LEFT JOIN users u"),
         // The pinned read carries the expiry predicate (token_hash = ? AND
@@ -117,7 +117,7 @@ test("POST /api/logout deletes the row and expires the cookie — behind same-or
   for (const pin of ["Max-Age=0", "HttpOnly", "SameSite=Lax"]) {
     assert.ok(cookie.includes(pin), "the expired cookie carries " + pin);
   }
-  const deletes = env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("DELETE FROM wa_sso_sessions"));
+  const deletes = env.FORUM_DB.executed.filter((e) => e.sql.startsWith("DELETE FROM wa_sso_sessions"));
   assert.equal(deletes.length, 1);
   assert.equal(deletes[0].bound[0], row.token_hash, "the delete keys on the session's own token hash");
 });
@@ -223,8 +223,8 @@ test("the dispatch loop's edges: unknown API paths 404, asset paths ride ASSETS"
 
 test("the SQL discipline pin: every write in the worker's api/ targets a wa_-prefixed table (the register users-row lane is the ONE documented exception), and no module reads a password column", async () => {
   // The exception (§4b, owner-approved): register.mjs creates the shared
-  // users row with the GC-precedent INSERT shape and cleans up its own
-  // placeholder row when the relay degrades — the GC register precedent the
+  // users row with the shared INSERT shape and cleans up its own
+  // placeholder row when the relay degrades — the register precedent the
   // design doc pins by name. Every OTHER write stays wa_-only.
   const REGISTER_USERS_LANE = /register\.mjs/;
   const { readdirSync, readFileSync } = await import("node:fs");

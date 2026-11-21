@@ -2,7 +2,7 @@
 -- tables on the SHARED wempo-forum-data D1 (the owner's explicit call: no
 -- second account registry ever exists; accounts rides the forum database).
 --
--- Same contract as the GC 0006/0007/0008 pins: every object here is
+-- The migration-scoping contract: every object here is
 -- wa_-prefixed and INDEPENDENT of every other migration — the file applies
 -- cleanly in any order and is idempotent (IF NOT EXISTS per the shared
 -- ledger's re-apply convention). The forum's `users` table is referenced
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS wa_login_tickets (
 
 -- wa_sso_sessions = the sessions of the accounts SITE itself (what
 -- "sign out everywhere" revokes in phase 2). Same shape and rules as the
--- forum/GC session tables: only the SHA-256 of the cookie token is stored
+-- forum session table: only the SHA-256 of the cookie token is stored
 -- (the raw token rides the Set-Cookie header exactly once), the CSRF token
 -- rides the row, and the cookie (wempo_account_session) stays on the
 -- accounts host — each member site keeps its OWN local session.

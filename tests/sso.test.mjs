@@ -51,7 +51,7 @@ async function liveSession() {
 
 function envForSession(sessionRow) {
   const env = { ...limiters() };
-  env.GOOBER_DB = fakeDb([
+  env.FORUM_DB = fakeDb([
     // The pinned session read (readSession): the expiry predicate is part of
     // the SQL, so the fake honors bound[1] — an expired row answers null.
     {
@@ -83,7 +83,7 @@ function redeemEnv({ changes, user = null, redeemFail = false, ticketReturn } = 
   env.RELAY_TOKEN = RELAY_TOKEN;
   const runs = [];
   env.lastChanges = runs;
-  env.GOOBER_DB = fakeDb([
+  env.FORUM_DB = fakeDb([
     {
       test: (sql) => sql.startsWith("UPDATE wa_login_tickets"),
       run: async (bound) => {
@@ -128,7 +128,7 @@ test("a signed-in ticket mint: hashed 60-second row + the site's own ?wt= redire
     // Exactly one INSERT — and it stores the HASH alone: the raw code never
     // rides any bound value, the row is the logged-in member's, the return
     // site is the exact allowlisted origin, and expiry is ≤60s past mint.
-    const inserts = env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets"));
+    const inserts = env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets"));
     assert.equal(inserts.length, 1);
     assert.match(
       inserts[0].sql,
@@ -142,7 +142,7 @@ test("a signed-in ticket mint: hashed 60-second row + the site's own ?wt= redire
     assert.ok(lifetime >= SSO_TICKET_TTL_SECONDS - 1 && lifetime <= SSO_TICKET_TTL_SECONDS, "expiry ≤ 60s past mint");
     assert.ok(inserts[0].bound.every((value) => value !== code), "the raw code is never stored");
     assert.ok(
-      env.GOOBER_DB.executed.some((e) => e.sql.startsWith("DELETE FROM wa_login_tickets WHERE expires_at <= ?")),
+      env.FORUM_DB.executed.some((e) => e.sql.startsWith("DELETE FROM wa_login_tickets WHERE expires_at <= ?")),
       "the expired-ticket sweep rides the mint",
     );
   }
@@ -158,7 +158,7 @@ test("no live session → the shared 401 (no cookie, and an EXPIRED row via the 
   const expiredResponse = await dispatch(ticketRequest(SSO_RETURN_ALLOWLIST[0], headers), envForSession(expired));
   assert.equal(expiredResponse.status, 401, "the pinned read's expires_at predicate decides liveness");
   assert.ok(
-    !envForSession(expired).GOOBER_DB.executed.some((e) => e.sql.includes("INSERT INTO wa_login_tickets")),
+    !envForSession(expired).FORUM_DB.executed.some((e) => e.sql.includes("INSERT INTO wa_login_tickets")),
     "no ticket mint ever rides a dead session",
   );
 });
@@ -170,12 +170,12 @@ test("non-allowlisted returns are the shared 403 — the exact-match pin (suffix
   // suffix, a same-host path, a case fold, a plain/scheme downgrade, and a
   // query-soup that CONTAINS an allowlisted origin without EQUALING one.
   const nearMisses = [
-    "https://wempos-forum.itswempo.workers.dev.evil.example",
-    "https://wempos-forum.itswempo.workers.dev/",
-    "HTTPS://WEMPOS-FORUM.ITSWEMPO.WORKERS.DEV",
-    "http://wempos-forum.itswempo.workers.dev",
-    "https://goobercord.itswempo.workers.dev.evil.example/?x=https://goobercord.itswempo.workers.dev",
-    "https://wempos-forum.itswempo.workers.dev https://goobercord.itswempo.workers.dev",
+    "https://wempos-forum.com.evil.example",
+    "https://wempos-forum.com/",
+    "HTTPS://WEMPOS-FORUM.COM",
+    "http://wempos-forum.com",
+    "https://wempos-forum.com.evil.example/?x=https://wempos-forum.com",
+    "https://evil.example https://wempos-forum.com",
   ];
   for (const bad of nearMisses) {
     const response = await dispatch(ticketRequest(bad, headers), env);
@@ -183,7 +183,7 @@ test("non-allowlisted returns are the shared 403 — the exact-match pin (suffix
     assert.deepEqual(await response.json(), { error: "This sign-in destination is not allowed." });
   }
   assert.equal(
-    env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets")).length,
+    env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets")).length,
     0,
     "no ticket row is ever written for a refused origin",
   );
@@ -205,7 +205,7 @@ test("the ticket route is the browser's flow: same-origin is a gate (missing or 
     );
     assert.equal(response.status, 403, "an unverifiable origin is refused, with and without the header");
     assert.equal(
-      env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets")).length,
+      env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_login_tickets")).length,
       0,
       "no mint rides an unverifiable origin",
     );
@@ -216,7 +216,7 @@ test("the ticket route is the browser's flow: same-origin is a gate (missing or 
 
 test("a live redeem: ONE guarded UPDATE, identity read from the users row, never written", async () => {
   const user = { id: 7, username: "wempos", role: "moderator" };
-  const env = redeemEnv({ user, ticketReturn: "https://wempos-forum.itswempo.workers.dev" });
+  const env = redeemEnv({ user, ticketReturn: "https://wempos-forum.com" });
   const t0 = nowSeconds();
   // The sites' workers echo the literal code; the normalize (trim + lowercase)
   // pins here too — an honest paste with padding and case folds still hashes
@@ -231,7 +231,7 @@ test("a live redeem: ONE guarded UPDATE, identity read from the users row, never
   assert.deepEqual(await response.json(), { userId: 7, username: "wempos", role: "admin" },
     "the stored tier renders through publicRole, identity columns only");
 
-  const updates = env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
+  const updates = env.FORUM_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
   assert.equal(updates.length, 1);
   assert.match(
     updates[0].sql,
@@ -242,10 +242,10 @@ test("a live redeem: ONE guarded UPDATE, identity read from the users row, never
   assert.equal(updates[0].bound[1], "wempos-forum", "the calling worker's stamp rides the row");
   assert.equal(updates[0].bound[2], await sha256Hex(code.trim().toLowerCase()), "the comparison key is the stored hash");
   assert.equal(updates[0].bound[3] >= t0, true, "the expiry predicate binds the redeem moment");
-  assert.equal(updates[0].bound[4], "https://wempos-forum.itswempo.workers.dev",
+  assert.equal(updates[0].bound[4], "https://wempos-forum.com",
     "the declared origin is asserted against the ticket's OWN return_site");
 
-  const identities = env.GOOBER_DB.executed.filter((e) => e.sql.includes("JOIN users u"));
+  const identities = env.FORUM_DB.executed.filter((e) => e.sql.includes("JOIN users u"));
   assert.equal(identities.length, 1, "exactly one identity read, after the guarded update");
   assert.match(identities[0].sql, /SELECT u\.id, u\.username, u\.role/, "identity columns only");
 });
@@ -258,35 +258,27 @@ test("an absent/junk worker stamp establishes nothing — the shared 410, no sto
     if (stamp !== undefined) overrides["X-Relay-Worker"] = stamp;
     const response = await dispatch(redeemRequest("ab".repeat(32), overrides), env);
     assert.equal(response.status, 410, "a stamp that names no member origin redeems nothing");
-    assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets")).length, 0,
+    assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets")).length, 0,
       JSON.stringify(stamp) + ": refused BEFORE any storage question");
-    assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length, 0,
+    assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length, 0,
       "and the identity is never read");
   }
 });
 
-test("a WRONG-worker redeem is the same uniform refusal — a ticket minted for one member site never redeems at the other", async () => {
+test("a WRONG-site redeem is the same uniform refusal — a ticket minted for another site never redeems at the forum", async () => {
   const user = { id: 7, username: "wempos", role: "moderator" };
-  // Minted for GooberCord: a wempos-forum-stamped redeem must not land.
-  const env = redeemEnv({ user, ticketReturn: "https://goobercord.itswempo.workers.dev" });
+  // Minted for a foreign origin: a wempos-forum-stamped redeem must not land.
+  const env = redeemEnv({ user, ticketReturn: "https://other-site.example" });
   const response = await dispatch(
     redeemRequest("ab".repeat(32), { "X-Relay-Worker": "wempos-forum" }),
     env,
   );
   assert.equal(response.status, 410, "the enforced predicate refuses the mismatch — no oracle for which");
-  const updates = env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
+  const updates = env.FORUM_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
   assert.equal(updates.length, 1, "the mismatch is decided INSIDE the guarded UPDATE");
   assert.equal(env.lastChanges[0], 0, "the ticket is NOT burned by the wrong worker — it stays valid at its own site");
-  assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length, 0,
+  assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length, 0,
     "the identity is never read on a refused redeem");
-
-  // Minted for the forum: a goobercord-stamped redeem must not land either.
-  const env2 = redeemEnv({ user, ticketReturn: "https://wempos-forum.itswempo.workers.dev" });
-  const response2 = await dispatch(
-    redeemRequest("ab".repeat(32), { "X-Relay-Worker": "goobercord" }),
-    env2,
-  );
-  assert.equal(response2.status, 410);
 });
 
 test("the redeem lane carries its own throttle: the keyed bucket answers BEFORE any storage question", async () => {
@@ -301,7 +293,7 @@ test("the redeem lane carries its own throttle: the keyed bucket answers BEFORE 
   );
   assert.equal(response.status, 429);
   assert.match(response.headers.get("Retry-After") || "", /^\d+$/);
-  const writes = throttled.GOOBER_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
+  const writes = throttled.FORUM_DB.executed.filter((e) => e.sql.startsWith("UPDATE wa_login_tickets"));
   assert.equal(writes.length, 0);
   assert.equal(throttled.fakes.redeem.calls.length, 1, "one keyed pass on the WA_REDEEM namespace");
 
@@ -328,7 +320,7 @@ test("the guard refusing (expired OR already-redeemed OR unknown code) is the sh
     assert.equal(response.status, 410, why + " answers 410");
     assert.deepEqual(await response.json(), { error: TICKET_GONE }, "one shared copy, no oracle for which");
     assert.equal(
-      env.GOOBER_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length,
+      env.FORUM_DB.executed.filter((e) => e.sql.includes("JOIN users u")).length,
       0,
       "the identity read never rides a refused redeem: " + why,
     );
@@ -346,7 +338,7 @@ test("the relay token is the whole redeem auth: wrong, missing, or unconfigured 
     const response = await dispatch(redeemRequest("ab".repeat(32), overrides), env);
     assert.equal(response.status, 401, "the presented token must equal the shared secret exactly");
     assert.deepEqual(await response.json(), { error: "Relay refused." });
-    assert.equal(env.GOOBER_DB.executed.length, 0, "no statement rides an unauthenticated lane");
+    assert.equal(env.FORUM_DB.executed.length, 0, "no statement rides an unauthenticated lane");
   }
 });
 
@@ -356,7 +348,7 @@ test("a malformed code is a shape 400 before any storage question (and unrouted 
     const response = await dispatch(redeemRequest(bad), env);
     assert.equal(response.status, 400, "non-32-byte-hex input is a 400: " + JSON.stringify(bad));
     assert.deepEqual(await response.json(), { error: "That sign-in ticket is not valid." });
-    assert.equal(env.GOOBER_DB.executed.length, 0, "no statement rides a malformed code");
+    assert.equal(env.FORUM_DB.executed.length, 0, "no statement rides a malformed code");
   }
 
   // Non-string bodies answer the same 400 (the normalize never sees them).
@@ -402,11 +394,8 @@ test("source pin: tickets are stored hash-only and users is a read-only FK targe
   assert.equal(writes[2].startsWith('"UPDATE wa_login_tickets SET redeemed_at = ?'), true, "the redeem is THE guarded one");
 });
 
-test("the allowlist constants: exactly the two member-site origins, frozen, with the 60s ticket cap", async () => {
-  assert.deepEqual([...SSO_RETURN_ALLOWLIST], [
-    "https://wempos-forum.itswempo.workers.dev",
-    "https://goobercord.itswempo.workers.dev",
-  ]);
+test("the allowlist constants: exactly the forum origin, frozen, with the 60s ticket cap", async () => {
+  assert.deepEqual([...SSO_RETURN_ALLOWLIST], ["https://wempos-forum.com"]);
   assert.ok(Object.isFrozen(SSO_RETURN_ALLOWLIST), "the allowlist cannot be mutated at runtime");
   assert.equal(SSO_TICKET_TTL_SECONDS, 60, "the ticket lifetime cap is 60 seconds");
 });
@@ -417,8 +406,8 @@ test("the redeem worker-slug map exactly covers the allowlist — every slug red
     [...SSO_RETURN_ALLOWLIST].sort(),
     "the slug map's origins are exactly the allowlisted member sites",
   );
-  assert.deepEqual([...Object.keys(SSO_TICKET_SITE_BY_WORKER)].sort(), ["goobercord", "wempos-forum"],
-    "the constant-set slugs are exactly the two calling workers'");
+  assert.deepEqual([...Object.keys(SSO_TICKET_SITE_BY_WORKER)].sort(), ["wempos-forum"],
+    "the constant-set slug is exactly the forum worker's");
   for (const slug of Object.keys(SSO_TICKET_SITE_BY_WORKER)) {
     assert.match(slug, /^[A-Za-z0-9-]{1,64}$/, "every slug passes the same shape check redeemStamp applies");
   }

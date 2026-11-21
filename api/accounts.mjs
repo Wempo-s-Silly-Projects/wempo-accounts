@@ -18,8 +18,8 @@
 
 // Accounts routes (phase 1: scaffold + login): POST /api/login (password +
 // Turnstile + the TOTP second step), GET /api/me, POST /api/logout. The
-// route/shape/status-code handling mirrors GooberCord's api/accounts.mjs
-// (itself the forum's session.mjs ordering: same-origin → rate limit → body
+// route/shape/status-code handling mirrors the forum's ordering
+// (the forum's session.mjs ordering: same-origin → rate limit → body
 // → TOTP branch → session mint), with three deliberate substitutions:
 //   • The password question is never answered here — the RELAY is. Accounts
 //     reads only identity/2FA columns of the shared users table; the pepper
@@ -45,7 +45,7 @@ import { handleSsoRoutes } from "./sso.mjs";
 import { handleManageRoutes } from "./manage.mjs";
 import { isValidUsername } from "./usernames.mjs";
 
-// Test seam (the GooberCord pattern): real deployments always run the
+// Test seam: real deployments always run the
 // vendored requireTurnstile, which calls Cloudflare's siteverify endpoint.
 // Tests inject `env._turnstileVerify` — a function with the same
 // (request, env, body, expectedAction) signature — so tests never touch the
@@ -126,7 +126,7 @@ async function handleMeRoute(request, env) {
 async function handleLogoutRoute(request, env) {
   await rateLimit(request, env, "write");
   const session = await requireCsrf(request, env);
-  await env.GOOBER_DB.prepare(
+  await env.FORUM_DB.prepare(
     "DELETE FROM wa_sso_sessions WHERE token_hash = ?",
   ).bind(session.tokenHash).run();
   return new Response(null, {

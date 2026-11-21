@@ -63,7 +63,7 @@ function envForSession(sessionRow, relay, extraRoutes = []) {
   const env = { ...limiters() };
   env.RELAY_TOKEN = relay.token;
   env.FORUM_WORKER = relay;
-  env.GOOBER_DB = fakeDb([
+  env.FORUM_DB = fakeDb([
     {
       test: (sql) => sql.includes("FROM wa_sso_sessions s LEFT JOIN users u"),
       // The pinned read carries the expiry predicate; the fake honors
@@ -118,9 +118,9 @@ test("the success path: verify leg then set leg, one apiece, in order — and no
   // No credential material ever rides the answer, and no SESSION WRITE ran —
   // the session join read is the only wa_ SQL the lane touches, and the
   // password never gets near an Accounts-side table by construction.
-  assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("SELECT ") && e.sql.includes("users WHERE")).length, 0);
+  assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.startsWith("SELECT ") && e.sql.includes("users WHERE")).length, 0);
   assert.equal(
-    env.GOOBER_DB.executed.filter((e) => e.sql.includes("wa_sso_sessions") && !e.sql.includes("LEFT JOIN users u")).length,
+    env.FORUM_DB.executed.filter((e) => e.sql.includes("wa_sso_sessions") && !e.sql.includes("LEFT JOIN users u")).length,
     0,
     "no session write of any kind",
   );

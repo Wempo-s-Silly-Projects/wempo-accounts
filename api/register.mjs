@@ -17,8 +17,8 @@
 // see <https://www.gnu.org/licenses/>
 
 // The Make Account route (§4b): POST /api/register — the accounts front
-// door's create-account lane. The users row is created with the GC-precedent
-// INSERT shape (GooberCord api/accounts.mjs storeUser verbatim column list),
+// door's create-account lane. The users row is created with the shared
+// users INSERT shape (the forum's users column list),
 // and the password hash is written by the FORUM through the credential relay
 // (/api/relay/password-set) — accounts never sees a pepper and stores no
 // hash material of its own. The placeholder salt/hash the INSERT carries is
@@ -26,15 +26,15 @@
 // relay DELETES the just-inserted row and fails the registration closed (a
 // row whose hash no worker can verify must never survive).
 //
-// The ordering mirrors the login route and GC's register exactly:
+// The ordering mirrors the login route exactly:
 //   same-origin → rate limits (IP then account-keyed) → Turnstile
 //   ("register" action, fail-closed) → username shape → the SHARED username
 //   word filter (site_settings, read-only here; api/filter.mjs is the
-//   verbatim vendor of GC's) → duplicate-username 409 → the INSERT →
+//   shared filter module) → duplicate-username 409 → the INSERT →
 //   relaySet → auto-login (wa_sso_sessions) → the response, which the page
 //   turns into the §2 ticket redirect through its finishLogin flow.
 //
-// Register is NOT the GC route's /api/auth/register path — accounts' own
+// Register is NOT a member site's /api/auth/register path — accounts' own
 // lane is /api/register (the §4b "the sites keep their own plumbing" rule;
 // no path collision with anything the sites expose).
 import { assertSameOrigin, createSession, userByUsernameKey, publicUser } from "./core/auth.mjs";
@@ -45,7 +45,7 @@ import { relaySet } from "./relay.mjs";
 import { applyWordFilter, containsFilteredWord, normalizeUsernameForFilter } from "./filter.mjs";
 import { isValidUsername } from "./usernames.mjs";
 
-// Test seam (the GooberCord registration pattern): production always runs
+// Test seam: production always runs
 // the vendored requireTurnstile; tests inject env._turnstileVerify.
 async function requireRegisterTurnstile(request, env, body) {
   if (typeof env._turnstileVerify === "function") {
@@ -58,7 +58,7 @@ async function requireRegisterTurnstile(request, env, body) {
 // The shared username word filter: the desk-stored list lives in D1's
 // site_settings under the same key the forum desk writes. Accounts only ever
 // READS it (forum tables are read-only here); a failed read means an EMPTY
-// effective list, exactly like an empty desk list reads at GC — the two
+// effective list, exactly like an empty desk list reads on the forum — the two
 // filter passes become strict no-ops, never a register refusal.
 //
 // A cache matters because register is a hot anonymous route: one shared
@@ -72,7 +72,7 @@ export async function registerFilterWords(env) {
     return filterCache.raw;
   }
   try {
-    const row = await env.GOOBER_DB.prepare(
+    const row = await env.FORUM_DB.prepare(
       "SELECT value, updated_at FROM site_settings WHERE key = ? LIMIT 1",
     ).bind(FILTER_KEY).first();
     if (row) {
@@ -94,7 +94,7 @@ export function resetFilterCacheForTests() {
   filterCache = { loaded: false, raw: "", at: 0 };
 }
 
-// New credential shape (GooberCord validateNewCredentials verbatim, minus the
+// New credential shape (the shared validateNewCredentials rule, minus the
 // pepper-module password check — the length rule IS the password's public
 // shape; the relay re-validates strength with the forum's own isValidPassword
 // before it stores anything).
@@ -110,7 +110,7 @@ function validateNewCredentials(body) {
   return { username, usernameKey: username.toLowerCase(), password };
 }
 
-// The GC-precedent INSERT, with the credential columns as placeholders the
+// The shared users INSERT, with the credential columns as placeholders the
 // relay overwrites (verified below) — a member row must always exist before
 // the forum's password-set can UPDATE it.
 const PLACEHOLDER_SALT = "00000000000000000000000000000000";
@@ -119,17 +119,17 @@ const PLACEHOLDER_HASH = "0".repeat(64);
 async function storeUser(env, credentials) {
   const now = nowSeconds();
   try {
-    const result = await env.GOOBER_DB.prepare(
+    const result = await env.FORUM_DB.prepare(
       "INSERT INTO users (username, username_key, password_salt, password_hash, role, bio, created_at) " +
         "VALUES (?, ?, ?, ?, ?, '', ?)",
     ).bind(credentials.username, credentials.usernameKey, PLACEHOLDER_SALT, PLACEHOLDER_HASH, ROLE_MEMBER_DB, now).run();
-    return await env.GOOBER_DB.prepare(
+    return await env.FORUM_DB.prepare(
       "SELECT id, username, username_key, password_salt, password_hash, role, bio, " +
         "avatar_status, avatar_mime, avatar_updated_at, avatar_version, totp_enabled " +
         "FROM users WHERE id = ? LIMIT 1",
     ).bind(Number(result.meta.last_row_id)).first();
   } catch (error) {
-    // Same duplicate-username diagnosis as the forum/GC pair: the unique
+    // Same duplicate-username diagnosis as the forum: the unique
     // index on username_key fails the insert, and the pre-existing row (if
     // any) turns it into a user-facing 409 instead of a 500.
     const existing = await userByUsernameKey(env, credentials.usernameKey);
@@ -146,7 +146,7 @@ async function storeUser(env, credentials) {
 async function writePasswordThroughRelay(env, user, password) {
   const answer = await relaySet(env, user.username, password);
   if (answer && answer.changed === true) return;
-  await env.GOOBER_DB.prepare(
+  await env.FORUM_DB.prepare(
     "DELETE FROM users WHERE id = ? AND password_hash = ?",
   ).bind(Number(user.id), PLACEHOLDER_HASH).run();
   // The relay's non-ok and unreachable paths both answer null — a refused
@@ -164,8 +164,8 @@ export async function handleRegisterRoute(request, env) {
   await rateLimit(request, env, "register", "account:" + usernameKey);
   // Fail-closed human verification BEFORE any credential work.
   await requireRegisterTurnstile(request, env, body);
-  // Username word filter — identity, never prose (the GC-parity check at the
-  // GC-parity spot: right after the shape validation).
+  // Username word filter — identity, never prose (the check sits
+  // right after the shape validation).
   const words = await registerFilterWords(env);
   if (
     applyWordFilter(username, words) !== username ||

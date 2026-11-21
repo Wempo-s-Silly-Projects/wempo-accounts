@@ -17,7 +17,7 @@
 // see <https://www.gnu.org/licenses/>
 
 // Relay wiring tests (mock FORUM_WORKER): the credential relay client rides
-// the SAME contract GooberCord's api/relay.mjs established — service-bound
+// the forum relay contract — service-bound
 // POST to https://relay.internal/api/relay/*, the X-Relay-Token header as
 // the whole auth, redacted JSON back, and a graceful null on every
 // degraded path (unconfigured token, unfetchable forum, non-2xx, bad JSON).

@@ -66,7 +66,7 @@ function forumWorker(validFor, { fail = false } = {}) {
 
 function envFor(user, { forum, limiterFails, turnstile } = {}) {
   const env = { ...limiters(limiterFails) };
-  env.GOOBER_DB = dbFor(user);
+  env.FORUM_DB = dbFor(user);
   env.RELAY_TOKEN = RELAY_TOKEN;
   env.FORUM_WORKER = forum;
   // Tests that pin the credential/TOTP path get the approving seam by
@@ -109,12 +109,12 @@ test("a verified password mints a wa_sso_sessions row: 200 + cookie + csrf", asy
 
   // Session writes: one INSERT (the verified user's token hash + CSRF) and
   // the expiry sweep — both wa_-prefixed, no forum-table write anywhere.
-  const inserts = env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_sso_sessions"));
+  const inserts = env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_sso_sessions"));
   assert.equal(inserts.length, 1);
   assert.equal(inserts[0].bound[1], 7, "the minted row is the verified user's");
-  const sweep = env.GOOBER_DB.executed.filter((e) => e.sql.includes("DELETE FROM wa_sso_sessions WHERE expires_at"));
+  const sweep = env.FORUM_DB.executed.filter((e) => e.sql.includes("DELETE FROM wa_sso_sessions WHERE expires_at"));
   assert.ok(sweep.length, "the expiry sweep runs after the mint");
-  for (const write of env.GOOBER_DB.executed.filter((e) => e.sql.startsWith("INSERT") || e.sql.startsWith("DELETE"))) {
+  for (const write of env.FORUM_DB.executed.filter((e) => e.sql.startsWith("INSERT") || e.sql.startsWith("DELETE"))) {
     assert.match(write.sql, /wa_sso_sessions/, "every write targets Accounts' own table: " + write.sql);
   }
 });
@@ -174,7 +174,7 @@ test("a degraded relay fails closed — and the forum binding is never asked wit
 test("Turnstile is fail-closed: the seam's refusal (or an unset secret) is a 403 BEFORE any relay call", async () => {
   const forum = forumWorker({ wempos: REAL_PASSWORD });
 
-  // The test seam (the GC hook) refuses: the route refuses equally and
+  // The test seam refuses: the route refuses equally and
   // never reaches the credential step.
   const env = envFor(usersRow(), {
     forum,
@@ -241,7 +241,7 @@ test("request-shape and same-origin gates: 400 on a malformed body, 403 without 
   assert.equal(forum.calls().length, 0, "no credential work rides a gate refusal");
 });
 
-const ORIGIN_PATH = "https://accounts.itswempo.workers.dev/api/login";
+const ORIGIN_PATH = "https://accounts.wempos-forum.com/api/login";
 
 test("the strict login tier: a missing limiter is 503, a throttled tier is 429", async () => {
   const forum = forumWorker({ wempos: REAL_PASSWORD });
@@ -279,7 +279,7 @@ test("the TOTP gate: no code asks (200, no cookie), a wrong code is ONE shared 4
   assert.deepEqual(await ask.json(), { totpRequired: true });
   assert.equal(ask.headers.get("Set-Cookie"), null);
   assert.equal(
-    askEnv.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO")).length,
+    askEnv.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO")).length,
     0,
     "no session rides the ask",
   );

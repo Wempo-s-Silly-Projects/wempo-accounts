@@ -20,7 +20,7 @@
 // sessions with only SHA-256 token hashes stored (migration 0001's
 // wa_sso_sessions — a wa_-prefixed table, never a forum object), the
 // same-origin and CSRF gates, and the users-row projection the page reads.
-// Vendored in shape from GooberCord's api/core/auth.mjs: the differences are
+// The member-site session shape, with these differences:
 // the wa_sso_sessions table, the wempo_account_session cookie, and the
 // narrower user projection (id/username/role/2FA-state — identity only, no
 // profile columns). Forum users rows are read here by contract; the
@@ -54,7 +54,7 @@ export function cookieValue(request, name) {
 // identity columns only (the password hash columns are NEVER listed here; not
 // even this worker's code touches them, by design).
 export async function userByUsernameKey(env, key) {
-  return env.GOOBER_DB.prepare(
+  return env.FORUM_DB.prepare(
     "SELECT id, username, username_key, role, totp_enabled " +
       "FROM users WHERE username_key = ? LIMIT 1",
   ).bind(key).first();
@@ -73,7 +73,7 @@ export async function readSession(request, env) {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token || !/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
   const tokenHash = await sha256Hex(token);
-  const row = await env.GOOBER_DB.prepare(
+  const row = await env.FORUM_DB.prepare(
     "SELECT s.session_id, s.token_hash, s.user_id, s.csrf_token, s.expires_at, " +
       "u.username, u.role, u.totp_enabled " +
       "FROM wa_sso_sessions s LEFT JOIN users u ON u.id = s.user_id " +
@@ -108,11 +108,11 @@ export async function createSession(request, env, userId) {
   const sessionId = hex(crypto.getRandomValues(new Uint8Array(16)));
   const now = nowSeconds();
   const expiresAt = now + SESSION_TTL_SECONDS;
-  await env.GOOBER_DB.prepare(
+  await env.FORUM_DB.prepare(
     "INSERT INTO wa_sso_sessions (token_hash, user_id, csrf_token, session_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
   ).bind(tokenHash, Number(userId), csrfToken, sessionId, now, expiresAt).run();
   // Housekeeping as a write to Accounts' OWN table only: expired rows leave.
-  await env.GOOBER_DB.prepare("DELETE FROM wa_sso_sessions WHERE expires_at <= ?").bind(now).run();
+  await env.FORUM_DB.prepare("DELETE FROM wa_sso_sessions WHERE expires_at <= ?").bind(now).run();
   return { tokenHash, csrfToken, setCookie: setCookie(request, token) };
 }
 

@@ -16,9 +16,8 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// The username shape rule shared with GooberCord's api/usernames.mjs (which
-// mirrors the forum's api/core/shapers.mjs character for character): one
-// rule, three apps.
+// The username shape rule shared with the forum (it mirrors the forum's
+// api/core/shapers.mjs character for character): one rule, both apps.
 export function isValidUsername(value) {
   return typeof value === "string" && /^[A-Za-z0-9_]{3,24}$/.test(value);
 }

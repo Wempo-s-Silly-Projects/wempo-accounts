@@ -23,13 +23,12 @@ let signingIn = false;
 // sole enforcement point; it answers a redirect only for an allowed origin.
 const ssoReturn = new URLSearchParams(window.location.search).get("return") || null;
 
-// The member-site names the continue-back card can speak of (the two known
-// member origins). The ?return value is NEVER trusted with navigation — the
+// The member-site names the continue-back card can speak of (the known
+// member origin). The ?return value is NEVER trusted with navigation — the
 // server's POST /api/sso/ticket allowlist and its redirect answer are the
 // only gate; this map is a human label and nothing more.
 const SSO_SITE_NAMES = {
-  "https://goobercord.itswempo.workers.dev": "GooberCord",
-  "https://wempos-forum.itswempo.workers.dev": "Wempo Forum",
+  "https://wempos-forum.com": "Wempo Forum",
 };
 
 // --- theme (dark-first) --------------------------------------------------------

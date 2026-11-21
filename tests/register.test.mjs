@@ -16,7 +16,7 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// POST /api/register — the §4b Make Account lane. Pins: the GC-precedent
+// POST /api/register — the §4b Make Account lane. Pins: the shared
 // users-row INSERT with the relay overwriting the hash (a degraded relay
 // deletes the placeholder and fails the registration closed; a refused set
 // is the forum's password rules 400), Turnstile fail-closed on the
@@ -54,7 +54,7 @@ function forumWorker({ verify = true, fail = false } = {}) {
 
 function envFor({ forum, limiterFails, turnstile } = {}) {
   const env = { ...limiters(limiterFails) };
-  env.GOOBER_DB = dbFor({
+  env.FORUM_DB = dbFor({
     id: 7, username: "wempos", username_key: "wempos", role: "member", totp_enabled: 0,
   }, null);
   env.RELAY_TOKEN = RELAY_TOKEN;
@@ -79,10 +79,10 @@ test("a Make Account POST creates the users row, sets the password through the r
   const cookie = response.headers.get("Set-Cookie");
   assert.ok(cookie && cookie.includes("wempo_account_session="), "the auto-login mint rides success");
 
-  // The users row: the GC-precedent INSERT with placeholder credential
+  // The users row: the shared INSERT with placeholder credential
   // columns, then the relay overwrite (username/password ride to the forum
   // with the shared token).
-  const inserted = env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO users"));
+  const inserted = env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO users"));
   assert.equal(inserted.length, 1);
   assert.equal(inserted[0].bound[4], "member", "the stored role is the member tier");
   const relayCall = forum.calls().find((call) => new URL(call.url).pathname === "/api/relay/password-set");
@@ -91,7 +91,7 @@ test("a Make Account POST creates the users row, sets the password through the r
   assert.deepEqual(relayCall.body, { username: "wempos", password: "a-fine-12-char-pass" });
 
   // The session mint writes Accounts' own table only.
-  const sessionWrite = env.GOOBER_DB.executed.find((e) => e.sql.includes("INSERT INTO wa_sso_sessions"));
+  const sessionWrite = env.FORUM_DB.executed.find((e) => e.sql.includes("INSERT INTO wa_sso_sessions"));
   assert.ok(sessionWrite, "the session lands in wa_sso_sessions");
 });
 
@@ -104,7 +104,7 @@ test("a degraded relay deletes the placeholder row and registration fails closed
     env,
   );
   assert.equal(response.status, 503);
-  const deletes = env.GOOBER_DB.executed.filter((e) =>
+  const deletes = env.FORUM_DB.executed.filter((e) =>
     e.sql.startsWith("DELETE FROM users WHERE id = ? AND password_hash = ?"));
   assert.equal(deletes.length, 1, "the just-inserted row does not survive a degraded relay");
   const bound = deletes[0].bound;
@@ -112,7 +112,7 @@ test("a degraded relay deletes the placeholder row and registration fails closed
   assert.equal(bound[1], "0".repeat(64), "and only the placeholder-hash row");
   // No session for an account whose password could never verify.
   assert.equal(
-    env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_sso_sessions")).length,
+    env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO wa_sso_sessions")).length,
     0,
   );
 });
@@ -126,7 +126,7 @@ test("a relay set the forum refused (400 over the binding) is the same fail-clos
     env,
   );
   assert.equal(response.status, 503);
-  assert.ok(env.GOOBER_DB.executed.some((e) =>
+  assert.ok(env.FORUM_DB.executed.some((e) =>
     e.sql.startsWith("DELETE FROM users WHERE id = ? AND password_hash = ?")),
   "the placeholder row is gone either way");
 });
@@ -142,14 +142,14 @@ test("no Turnstile verdict (or a missing secret) is a 403 BEFORE any D1 write", 
     env,
   );
   assert.equal(response.status, 403);
-  assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO users")).length, 0);
+  assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO users")).length, 0);
   assert.equal(forum.calls().length, 0, "no credential call rides an unverified request");
 });
 
-test("the shared username word filter refuses a filtered username with the GC copy", async () => {
+test("the shared username word filter refuses a filtered username with the shared copy", async () => {
   const forum = forumWorker();
   const env = envFor({ forum });
-  env.GOOBER_DB = dbFor({ id: 7, username: "wempos", username_key: "wempos", role: "member", totp_enabled: 0 },
+  env.FORUM_DB = dbFor({ id: 7, username: "wempos", username_key: "wempos", role: "member", totp_enabled: 0 },
     null, { filterWords: new Map([["filtered_words", "noob"]]) });
   resetFilterCacheForTests();
   const response = await dispatch(
@@ -158,7 +158,7 @@ test("the shared username word filter refuses a filtered username with the GC co
   );
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error, "That username isn't allowed.");
-  assert.equal(env.GOOBER_DB.executed.filter((e) => e.sql.includes("INSERT INTO users")).length, 0);
+  assert.equal(env.FORUM_DB.executed.filter((e) => e.sql.includes("INSERT INTO users")).length, 0);
 });
 
 test("the duplicate-username INSERT failure is the shared 409 and no relay call happens", async () => {
@@ -169,7 +169,7 @@ test("the duplicate-username INSERT failure is the shared 409 and no relay call 
   // after the unique-index insert failure.
   const { dbFor: originalDbFor } = await import("./harness.mjs");
   const failFirst = ["INSERT INTO users"];
-  env.GOOBER_DB = {
+  env.FORUM_DB = {
     prepare(sql) {
       if (failFirst.some((needle) => sql.includes(needle))) {
         return {

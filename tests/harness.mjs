@@ -16,14 +16,14 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// Shared test harness (the GooberCord fakeDb + pinned-SQL house style): a
+// Shared test harness (the fakeDb + pinned-SQL house style): a
 // statement-routing fake D1, fake rate limiters, a canonical users row, and
 // a dispatch helper that drives Accounts' worker entrypoint exactly as
 // workerd would (same origin, real Response objects — no network).
 import worker from "../worker.mjs";
 import { nowSeconds, sha256Hex } from "../api/core/crypto.mjs";
 
-const ORIGIN = "https://accounts.itswempo.workers.dev";
+const ORIGIN = "https://accounts.wempos-forum.com";
 
 // fakeDb routes by SQL text; each route may answer `first` (a row read) or
 // rely on the default run() result. Every statement that ever ran stays in
