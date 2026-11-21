@@ -241,7 +241,7 @@ test("request-shape and same-origin gates: 400 on a malformed body, 403 without 
   assert.equal(forum.calls().length, 0, "no credential work rides a gate refusal");
 });
 
-const ORIGIN_PATH = "https://accounts.itswempo.workers.dev/api/login";
+const ORIGIN_PATH = "https://accounts.wempos-forum.com/api/login";
 
 test("the strict login tier: a missing limiter is 503, a throttled tier is 429", async () => {
   const forum = forumWorker({ wempos: REAL_PASSWORD });
