@@ -2,7 +2,7 @@
 
 Thanks for wanting to help. Accounts is a Cloudflare Worker (vanilla
 imperative JS, no frontend framework, no build step) sharing one D1
-database and one identity layer with GooberCord and Wempo's Forum, so a
+database and one identity layer with Wempo's Forum, so a
 local run needs almost nothing.
 
 ## Setup
