@@ -54,13 +54,13 @@ function randomTicketCode() {
 }
 
 // The redeem stamp: the calling site's worker announces its identity with a
-// plain-slug X-Relay-Worker header ("goobercord" | "wempos-forum"). The slug
+// plain-slug X-Relay-Worker header ("wempos-forum"). The slug
 // is a convenience key, NOT an auth boundary — the constant-time-validated
 // relay token is the whole auth, and the stamp is read only AFTER that
 // validation. Anything else (or an absent header) is "unknown", and an
 // unknown worker redeems nothing: the redeem's WHERE asserts the ticket's
 // own return_site against the origin the slug maps to, so a ticket minted
-// for one member site can never be redeemed at the other (M1: the
+// for one member site can never be redeemed by another caller (M1: the
 // return_site is enforced, not just written — one leaked ?wt in its 60s
 // window buys exactly one site).
 const redeemStamp = (request) => {
@@ -94,11 +94,11 @@ async function handleTicketRoute(request, env) {
   const now = nowSeconds();
   const code = randomTicketCode();
   const codeHash = await sha256Hex(code);
-  await env.GOOBER_DB.prepare(
+  await env.FORUM_DB.prepare(
     "INSERT INTO wa_login_tickets (code_hash, user_id, return_site, expires_at) VALUES (?, ?, ?, ?)",
   ).bind(codeHash, session.user.id, returnOrigin, now + SSO_TICKET_TTL_SECONDS).run();
   // Housekeeping mirrors createSession's expiry sweep — Accounts' own table.
-  await env.GOOBER_DB.prepare("DELETE FROM wa_login_tickets WHERE expires_at <= ?").bind(now).run();
+  await env.FORUM_DB.prepare("DELETE FROM wa_login_tickets WHERE expires_at <= ?").bind(now).run();
 
   return json({ redirect: returnOrigin + "/?wt=" + code });
 }
@@ -147,7 +147,7 @@ async function handleRedeemRoute(request, env) {
   // changes!=1 gate an expired/already-redeemed/unknown-code redeem does:
   // the shared 410, no oracle for which (mismatched tickets are never
   // spent, and the identity read below runs only after changes==1).
-  const redeem = await env.GOOBER_DB.prepare(
+  const redeem = await env.FORUM_DB.prepare(
     "UPDATE wa_login_tickets SET redeemed_at = ?, redeemed_by = ? " +
       "WHERE code_hash = ? AND redeemed_at IS NULL AND expires_at > ? AND return_site = ?",
   ).bind(now, stamp, codeHash, now, declaredSite).run();
@@ -156,7 +156,7 @@ async function handleRedeemRoute(request, env) {
   }
 
   // Read-only identity answer: the FK target is READ here, never written.
-  const row = await env.GOOBER_DB.prepare(
+  const row = await env.FORUM_DB.prepare(
     "SELECT u.id, u.username, u.role FROM wa_login_tickets t " +
       "JOIN users u ON u.id = t.user_id WHERE t.code_hash = ? LIMIT 1",
   ).bind(codeHash).first();

@@ -1,6 +1,5 @@
 /* Wempo Accounts — page CSS. The token blocks below are PROJECT FRONTLOAD's
-   warm-paper tokens (copied from GooberCord's public/styles.css, both
-   blocks, values verbatim); everything past them is this page's small
+   warm-paper tokens (both blocks, values verbatim); everything past them is this page's small
    layout only. Dark-first: the DARK block is the :root default, a manual
    [data-theme="light"] flips to the light block, and [data-theme="dark"]
    re-states the default so a toggle never has to guess. */
@@ -152,7 +151,7 @@ a:hover {
 
 /* The shell: a dashed header band with blaxel in his welcome role, and #app
    as a COLUMN FLEX CHILD so the auth card centers on every viewport (the
-   GC fix — the card must not ride the page-level flex row). */
+   card must not ride the page-level flex row). */
 .site-header {
   border-bottom: 3px dashed var(--line);
   background: var(--paper);

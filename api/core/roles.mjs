@@ -21,8 +21,8 @@
 // is the admin tier and 'admin' is the owner tier. D1 cannot alter the CHECK
 // constraint short of rebuilding every table that references users, so the
 // stored vocabulary is FROZEN and publicRole() is the single map every role
-// value passes through on its way out of SQL. Vendored from GooberCord's
-// api/core/roles.mjs verbatim so both workers render the same identity.
+// value passes through on its way out of SQL. Kept verbatim with the forum's
+// api/core/roles.mjs so both workers render the same identity.
 // WARNING: publicRole is NOT idempotent — publicRole('admin') === 'owner' —
 // so only ever feed it raw DB values.
 export const ROLE_OWNER_DB = "admin";

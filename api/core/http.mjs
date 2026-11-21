@@ -18,7 +18,7 @@
 
 // Request/response glue — the typed error, JSON responses, the security-
 // header set, rate limiting, TURNSTILE verification, bounded JSON reading.
-// Vendored from GooberCord's api/core/http.mjs with Accounts' substitutions:
+// Shared shape with the forum's request glue, with Accounts' substitutions:
 // the WA_* limiter map (constants.mjs) and a login-specific expected action.
 import { RATE_LIMIT_BINDINGS, TURNSTILE_SITEVERIFY_URL } from "../../constants.mjs";
 import { sha256Hex } from "./crypto.mjs";
@@ -80,7 +80,7 @@ export async function rateLimit(request, env, scope, actor = "") {
   }
 }
 
-// Fail-closed human verification, exactly GooberCord's shape: an absent
+// Fail-closed human verification: an absent
 // secret, no configured hostnames, or a missing/oversized token is a 403
 // BEFORE any siteverify call; a siteverify error is a 403 too — the route
 // never degrades to allowing a request through. The hostname check matches

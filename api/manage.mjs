@@ -43,8 +43,8 @@
 //
 //   POST /api/sessions/revoke-all
 //     The TRUE sign-out-everywhere: the member-sites leg runs FIRST through
-//     the forum's token-gated /api/relay/session-revoke-all (GC's
-//     goober_session and the forum's wempo_session share the one `sessions`
+//     the forum's token-gated /api/relay/session-revoke-all (the
+//     forum's wempo_session lives in the one `sessions`
 //     table — one user_id-scoped DELETE there signs the member out of every
 //     member site; accounts never writes `sessions` directly), then the
 //     accounts' OWN rows go (the calling one INCLUDED — signedOut: true +
@@ -151,7 +151,7 @@ async function handleSessionsListRoute(request, env) {
   // The caller's own rows, live ones only; the expiry predicate rides the
   // WHERE exactly like the session-boot read. Only the non-secret
   // session_id + the two timestamps ever leave the worker.
-  const list = await env.GOOBER_DB.prepare(
+  const list = await env.FORUM_DB.prepare(
     "SELECT session_id, created_at, expires_at FROM wa_sso_sessions " +
       "WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC, session_id DESC",
   ).bind(Number(session.user.id), nowSeconds()).all();
@@ -180,12 +180,12 @@ async function handleSessionRevokeRoute(request, env) {
   }
   // The row must be the CALLING user's own and still live — a foreign or
   // expired id is the same "already gone" answer (no oracle for which).
-  const row = await env.GOOBER_DB.prepare(
+  const row = await env.FORUM_DB.prepare(
     "SELECT token_hash FROM wa_sso_sessions " +
       "WHERE session_id = ? AND user_id = ? AND expires_at > ? LIMIT 1",
   ).bind(sessionId, Number(session.user.id), nowSeconds()).first();
   if (!row) throw new HttpError(404, "That session is already gone.");
-  await env.GOOBER_DB.prepare(
+  await env.FORUM_DB.prepare(
     "DELETE FROM wa_sso_sessions WHERE session_id = ? AND user_id = ?",
   ).bind(sessionId, Number(session.user.id)).run();
 
@@ -207,8 +207,8 @@ async function handleSessionRevokeAllRoute(request, env) {
   if (!session.user) throw new HttpError(401, "Please sign in to do that.");
   const userId = Number(session.user.id);
 
-  // Leg 0 — the member sites. GC's goober_session and the forum's
-  // wempo_session hash into the SAME `sessions` table on the shared D1, so
+  // Leg 0 — the member sites. The forum's wempo_session hashes into the
+  // `sessions` table on the shared D1, so
   // the FORUM's token-gated relay route (a single user_id-scoped DELETE)
   // signs the member out of every member site at once. Accounts never
   // touches `sessions` directly (the wa_-only discipline stands; the relay
@@ -224,7 +224,7 @@ async function handleSessionRevokeAllRoute(request, env) {
   // token_hash <> ? exclusion is gone: "everywhere" is literally true, so
   // the caller's answer below carries signedOut: true + the expired cookie,
   // exactly like the calling-row revoke above).
-  const result = await env.GOOBER_DB.prepare(
+  const result = await env.FORUM_DB.prepare(
     "DELETE FROM wa_sso_sessions WHERE user_id = ?",
   ).bind(userId).run();
 
@@ -232,7 +232,7 @@ async function handleSessionRevokeAllRoute(request, env) {
   // (up to SSO_TICKET_TTL_SECONDS of life) would let a stale tab hop right
   // back to a member site AFTER the everywhere press. Those go too —
   // redeemed ones are already spent, so only the pending lane is deleted.
-  const tickets = await env.GOOBER_DB.prepare(
+  const tickets = await env.FORUM_DB.prepare(
     "DELETE FROM wa_login_tickets WHERE user_id = ? AND redeemed_at IS NULL",
   ).bind(userId).run();
 

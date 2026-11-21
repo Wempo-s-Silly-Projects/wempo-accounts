@@ -35,6 +35,16 @@ export { relayVerify, relaySet, relayRevokeAll } from "./api/relay.mjs";
 export { verifyTotpCode, totpAt } from "./api/core/totp.mjs";
 export { isValidUsername } from "./api/usernames.mjs";
 
+// The canonical accounts origin: every *.workers.dev request is moved here
+// with a permanent redirect before any routing (path + query preserved).
+const CANONICAL_ORIGIN = "https://accounts.wempos-forum.com";
+const LEGACY_HOST_SUFFIX = ".workers.dev";
+
+function canonicalRedirect(url) {
+  if (!url.hostname.endsWith(LEGACY_HOST_SUFFIX)) return null;
+  return Response.redirect(CANONICAL_ORIGIN + url.pathname + url.search, 301);
+}
+
 function secureResponse(response) {
   const headers = securityHeaders(response.headers);
   return new Response(response.body, {
@@ -56,9 +66,9 @@ async function routeApi(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
-  if (!env.GOOBER_DB) throw new HttpError(503, "The accounts database is not configured.");
+  if (!env.FORUM_DB) throw new HttpError(503, "The accounts database is not configured.");
 
-  // The global tier (the GC shape): GETs ride the read limiter, everything
+  // The global tier: GETs ride the read limiter, everything
   // else the write limiter; the strict per-route tiers (login, totp) stack
   // on top inside the handlers.
   await rateLimit(request, env, method === "GET" || method === "HEAD" ? "read" : "write");
@@ -73,6 +83,8 @@ async function routeApi(request, env, ctx) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const redirect = canonicalRedirect(url);
+    if (redirect) return redirect;
     if (url.pathname.startsWith("/api/")) {
       try {
         return await routeApi(request, env, ctx);

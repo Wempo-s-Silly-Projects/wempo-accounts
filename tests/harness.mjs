@@ -16,7 +16,7 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// Shared test harness (the GooberCord fakeDb + pinned-SQL house style): a
+// Shared test harness (the fakeDb + pinned-SQL house style): a
 // statement-routing fake D1, fake rate limiters, a canonical users row, and
 // a dispatch helper that drives Accounts' worker entrypoint exactly as
 // workerd would (same origin, real Response objects — no network).

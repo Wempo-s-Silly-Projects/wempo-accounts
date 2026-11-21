@@ -17,8 +17,8 @@
 // see <https://www.gnu.org/licenses/>
 
 // The crypto primitives everything bottoms out on — time, hex/base64url
-// codecs, random tokens, SHA-256, constant-time string comparison. Vendored
-// from GooberCord's api/core/crypto.mjs character for character (imports
+// codecs, random tokens, SHA-256, constant-time string comparison. Kept
+// identical to the forum's api/core/crypto.mjs character for character (imports
 // nothing; Web Crypto + TextEncoder only) so both workers' session/token
 // machinery stays provably identical.
 const encoder = new TextEncoder();

@@ -18,7 +18,7 @@
 
 // Migration 0001 scoping pin: the Wempo Accounts phase-1 D1 surface
 // (wa_login_tickets + wa_sso_sessions) on the SHARED wempo-forum-data D1.
-// Same contract as the GooberCord 0006/0007/0008 pins, with the accounts
+// The migration-scoping contract, with the accounts
 // prefix: every statement targets a wa_-prefixed object; `users` is never
 // created, altered, or written (it is only ever a read-only FK target —
 // a target, not a write). The parser below is STRICT by design: any
@@ -65,7 +65,7 @@ function statementsOf(text) {
   return statements;
 }
 
-// Same classify shape the GC pins use (this migration ships only the two
+// The shared classify shape (this migration ships only the two
 // statement forms the shared ledger's idempotent re-apply needs).
 function classify(statement) {
   const plain = statement.replace(/--[^\n]*/g, "").trim();
@@ -150,7 +150,7 @@ test("0001 ships exactly one lookup index (the expiry sweep) and is independent"
   // object outside the wa_ family and the read-only users FK — no gc_*
   // table, no forum session/ban/totp object is ever named as its own target.
   const stripped = sql.replace(/--[^\n]*/g, "");
-  assert.equal(/\bgc_/i.test(stripped), false, "no GooberCord object is referenced");
+  assert.equal(/\bgc_/i.test(stripped), false, "no legacy gc_ object is referenced");
   const statements = statementsOf(sql);
   const targets = [...new Set(statements.map((s) => classify(s).target || "").filter(Boolean))];
   assert.deepEqual(

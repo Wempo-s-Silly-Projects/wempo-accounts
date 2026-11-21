@@ -20,15 +20,15 @@
 // worker — the pepper lives ONLY on the forum worker as a wrangler secret,
 // and the shared users table stores hashes only the FORUM can verify. So
 // every credential question rides the forum worker's token-gated relay
-// (wempos-forum's api/relay.mjs), through a service binding (client copy
-// of GooberCord's api/relay.mjs, the same contract, one new consumer):
+// (wempos-forum's api/relay.mjs), through a service binding (the forum's
+// relay contract, Accounts as its consumer):
 //   relayVerify     → "are these credentials correct under the forum pepper?"
 //   relaySet        → "store this new password under the forum pepper" (the
 //                     change-password lane — register pins the contract)
 //   relayRevokeAll  → "sign this user out of every member site" (phase 3:
 //                     ONE user_id-scoped DELETE on the SHARED `sessions`
-//                     table — GC's goober_session and the forum's
-//                     wempo_session hash into the same table — answered with
+//                     table — the forum's wempo_session hashes into
+//                     that table — answered with
 //                     a count only, no existence oracle)
 // relayVerify answers REDACTED (ids, usernames, roles — no salt/hash
 // material) and burns the forum's own dummy salt for unknown usernames, so
@@ -39,7 +39,7 @@
 const RELAY_ORIGIN = "https://wempos-forum.com";
 const RELAY_TIMEOUT_MS = 10_000;
 // Same-zone subrequests to a SIBLING workers.dev script 404 at the edge
-// without entering the forum worker (the GC↔forum lesson), so THIS absolute
+// without entering the forum worker (the sibling-worker lesson), so THIS absolute
 // URL rides inside a service binding fetch only.
 const RELAY_INTERNAL_ORIGIN = "https://relay.internal";
 

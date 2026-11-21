@@ -16,8 +16,8 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// [Wempo Accounts vendor] Copied VERBATIM from GooberCord api/filter.mjs so the
-// register front door applies the username filter exactly as its siblings do.
+// [Wempo Accounts vendor] Kept VERBATIM with the forum's api/filter.mjs so the
+// register front door applies the username filter exactly as the forum does.
 // Post/reply word filter. The word list is PRIVATE: it comes from the
 // FILTERED_WORDS secret (a comma-separated string; see
 // config/filtered-words-template.txt) and is never imported from a source

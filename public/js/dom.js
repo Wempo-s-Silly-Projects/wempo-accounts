@@ -1,4 +1,4 @@
-// Tiny CSP-safe DOM factory (vendored from GooberCord's public/js/dom.js):
+// Tiny CSP-safe DOM factory:
 // every element is created via createElement and user-provided TEXT rides
 // textContent only — never innerHTML (the forum's escaping discipline; user
 // data must never reach a markup parser).

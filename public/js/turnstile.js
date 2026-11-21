@@ -1,8 +1,7 @@
-// The Turnstile client for the login page (a trimmed copy of GooberCord's
-// public/js/turnstile.js): the widget loads lazily, the token rides the
+// The Turnstile client for the login page: the widget loads lazily, the token rides the
 // login POST as `cf-turnstile-response`, and nothing user-facing is built
 // with markup strings. The sitekey CONSTANT is Accounts' OWN widget — the
-// owner mints a Turnstile widget for accounts.wempos-forum.com.
+// owner mints a Turnstile widget for accounts.wempos-forum.com
 // (TURNSTILE_HOSTNAMES in wrangler.toml) and pastes its sitekey here; an
 // empty string keeps the widget unrendered (the server stays fail-closed).
 const TURNSTILE_SITEKEY = "0x4AAAAAAFXrK9dxFMt6fp46";
