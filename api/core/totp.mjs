@@ -16,7 +16,7 @@
 // GNU Affero General Public License along with this program.  If not,
 // see <https://www.gnu.org/licenses/>
 
-// TOTP (RFC 6238) — vendored from GooberCord's api/core/totp.mjs verbatim so
+// TOTP (RFC 6238) — kept verbatim with the forum's api/core/totp.mjs so
 // both workers verify authenticator codes with the SAME module against the
 // SAME users rows. The 2FA feature is verification-only: no recovery codes,
 // no email fallback — losing the secret is losing the account until the
