@@ -1,10 +1,16 @@
 # Wempo Accounts — the one account home for Wempo's projects
 # (docs/superpowers/specs/2026-11-16-wempo-accounts-design.md, phase 1:
-# scaffold + login). The worker NAME is the URL: accounts.wempos-forum.com
+# scaffold + login). Served at accounts.wempos-forum.com (custom domain).
 name = "accounts"
 main = "worker.mjs"
 compatibility_date = "2026-10-13"
 workers_dev = true
+# Home: accounts.wempos-forum.com (Cloudflare custom domain, same account).
+# workers_dev stays on so the old *.workers.dev URL keeps answering — the
+# worker 301s it to the canonical origin.
+routes = [
+  { pattern = "accounts.wempos-forum.com", custom_domain = true },
+]
 
 [vars]
 TURNSTILE_HOSTNAMES = "accounts.wempos-forum.com"
@@ -15,20 +21,19 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = true
 
-# Shared production D1: the SAME database_id as the forum's FORUM_DB and
-# GooberCord's GOOBER_DB — one account registry lives there (the owner's
-# explicit call). Accounts may CREATE/READ/WRITE only wa_-prefixed tables
+# Shared production D1: the SAME database_id as the forum's FORUM_DB — one
+# account registry lives there (the owner's explicit call). Accounts may CREATE/READ/WRITE only wa_-prefixed tables
 # (migrations/0001) and READS the forum users table for identity; every
 # password verify/set rides the FORUM_WORKER relay below.
 [[d1_databases]]
-binding = "GOOBER_DB"
+binding = "FORUM_DB"
 database_name = "wempo-forum-data"
 database_id = "e648d306-2c2b-4ddc-aaf1-cef2e023a88c"
 migrations_dir = "migrations"
 
-# Rate limiters are Accounts' own (binding names WA_*; ids in a FRESH range —
-# well clear of GooberCord's 614202610143101–109 block), so the three apps
-# never contend for each other's throttle. Login is the strict tier.
+# Rate limiters are Accounts' own (binding names WA_*; ids in a FRESH range,
+# well clear of the forum's), so the two apps never contend for each
+# other's throttle. Login is the strict tier.
 [[ratelimits]]
 name = "WA_LOGIN_RATE_LIMITER"
 namespace_id = "614202610144101"
@@ -92,7 +97,7 @@ period = 60
 
 # Credential relay: DIRECT invocation of the forum worker (same account).
 # A same-zone fetch to a SIBLING workers.dev script 404s at the edge without
-# entering the forum worker (the GooberCord lesson), so the relay rides a
+# entering the forum worker, so the relay rides a
 # service binding: no hop, no interception, token still required. The forum
 # worker keeps the pepper; Accounts must NEVER see a password hash.
 [[services]]

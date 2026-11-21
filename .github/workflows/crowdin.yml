@@ -2,8 +2,7 @@ name: Crowdin translations
 
 # Community-translations pull: a manual-dispatch sync (no cron while the
 # string extraction is pending — see the PREREQUISITE note in crowdin.yml).
-# Once public/locales/en.json exists, flip to cron the same way
-# GooberCord's is.
+# Once public/locales/en.json exists, flip it to a cron schedule.
 
 on:
   workflow_dispatch:
@@ -16,8 +15,8 @@ jobs:
   crowdin:
     runs-on: ubuntu-latest
     steps:
-      # Hash-pinned (the Aikido issue-13 standard on GooberCord: every
-      # third-party action pinned by commit SHA).
+      # Hash-pinned (the fleet standard: every third-party action pinned
+      # by commit SHA).
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
