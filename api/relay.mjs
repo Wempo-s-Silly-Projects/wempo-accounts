@@ -36,7 +36,7 @@
 // (RELAY_TOKEN secret on BOTH workers); every call degrades gracefully: an
 // unconfigured token or an unreachable forum returns null and callers fail
 // their credential path closed.
-const RELAY_ORIGIN = "https://wempos-forum.itswempo.workers.dev";
+const RELAY_ORIGIN = "https://wempos-forum.com";
 const RELAY_TIMEOUT_MS = 10_000;
 // Same-zone subrequests to a SIBLING workers.dev script 404 at the edge
 // without entering the forum worker (the GC↔forum lesson), so THIS absolute
