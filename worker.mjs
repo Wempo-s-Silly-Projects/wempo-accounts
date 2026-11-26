@@ -35,7 +35,7 @@ export { relayVerify, relaySet, relayRevokeAll } from "./api/relay.mjs";
 export { verifyTotpCode, totpAt } from "./api/core/totp.mjs";
 export { isValidUsername } from "./api/usernames.mjs";
 
-const ROBOTS_TXT = "User-agent: *\\nAllow: /\\nDisallow: /api/\\n";
+const ROBOTS_TXT = "User-agent: *\nAllow: /\nDisallow: /api/\n";
 
 // The canonical accounts origin: every *.workers.dev request is moved here
 // with a permanent redirect before any routing (path + query preserved).
