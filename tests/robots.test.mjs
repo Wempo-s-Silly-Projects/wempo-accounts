@@ -27,7 +27,7 @@ test("GET /robots.txt serves the crawler policy as plain text without database a
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type") || "", /^text\/plain(?:;|$)/i);
-  assert.equal(await response.text(), "User-agent: *\\nAllow: /\\nDisallow: /api/\\n");
+  assert.equal(await response.text(), "User-agent: *\nAllow: /\nDisallow: /api/\n");
   assert.match(response.headers.get("Cache-Control") || "", /public/);
   assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
 });
