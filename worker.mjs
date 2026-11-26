@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses>
+// see <https://www.gnu.org/licenses/>
 
 // Wempo Accounts — worker entrypoint. All handler logic lives under api/;
 // worker.mjs owns only the dispatch loop:
@@ -108,7 +108,7 @@ export default {
       // as the API: one discipline for every byte this worker emits.
       return secureResponse(await env.ASSETS.fetch(request));
     } catch (error) {
-      console.error("Accounts request failed:", error);
+      console.error("Static asset request failed:", error);
       return json({ error: "The requested page could not be loaded." }, 500);
     }
   },
