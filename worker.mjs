@@ -35,6 +35,15 @@ export { relayVerify, relaySet, relayRevokeAll } from "./api/relay.mjs";
 export { verifyTotpCode, totpAt } from "./api/core/totp.mjs";
 export { isValidUsername } from "./api/usernames.mjs";
 
+const ROBOTS_TXT = "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://accounts.wempos-forum.com/sitemap.xml\n";
+
+// Accounts has one public page today: the sign-in/create-account shell at /.
+// Keep this inventory in sync if additional public pages are added or removed.
+const SITEMAP_XML = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+  "  <url><loc>https://accounts.wempos-forum.com/</loc></url>\n" +
+  "</urlset>\n";
+
 // The canonical accounts origin: every *.workers.dev request is moved here
 // with a permanent redirect before any routing (path + query preserved).
 const CANONICAL_ORIGIN = "https://accounts.wempos-forum.com";
@@ -85,6 +94,17 @@ export default {
     const url = new URL(request.url);
     const redirect = canonicalRedirect(url);
     if (redirect) return redirect;
+    if ((url.pathname === "/robots.txt" || url.pathname === "/sitemap.xml") &&
+      (request.method === "GET" || request.method === "HEAD")) {
+      const isRobots = url.pathname === "/robots.txt";
+      const body = isRobots ? ROBOTS_TXT : SITEMAP_XML;
+      return secureResponse(new Response(request.method === "HEAD" ? null : body, {
+        headers: {
+          "Cache-Control": "public, max-age=3600",
+          "Content-Type": isRobots ? "text/plain; charset=utf-8" : "application/xml; charset=utf-8",
+        },
+      }));
+    }
     if (url.pathname.startsWith("/api/")) {
       try {
         return await routeApi(request, env, ctx);
