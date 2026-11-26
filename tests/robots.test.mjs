@@ -20,24 +20,46 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { dispatch, ORIGIN } from "./harness.mjs";
+import { dispatch, fakeDb, ORIGIN } from "./harness.mjs";
+
+function assertPublicCachePolicy(response) {
+  const directives = new Set((response.headers.get("Cache-Control") || "")
+    .split(",")
+    .map((directive) => directive.trim().toLowerCase()));
+  assert.ok(directives.has("public"), "Cache-Control must include public");
+  assert.ok(directives.has("max-age=3600"), "Cache-Control must include max-age=3600");
+  assert.ok(!directives.has("no-store"), "Cache-Control must not include no-store");
+  assert.ok(!directives.has("no-cache"), "Cache-Control must not include no-cache");
+  assert.ok(!directives.has("private"), "Cache-Control must not include private");
+}
+
+function assertDiscoveryMetadataMatches(getResponse, headResponse) {
+  for (const name of ["Content-Type", "Cache-Control", "X-Content-Type-Options"]) {
+    assert.equal(headResponse.headers.get(name), getResponse.headers.get(name),
+      `HEAD must preserve ${name} from GET`);
+  }
+}
 
 test("GET /robots.txt serves the crawler policy as plain text without database access", async () => {
-  const response = await dispatch(new Request(ORIGIN + "/robots.txt"), {});
+  const db = fakeDb([]);
+  const response = await dispatch(new Request(ORIGIN + "/robots.txt"), { FORUM_DB: db });
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type") || "", /^text\/plain(?:;|$)/i);
   assert.equal(await response.text(), "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://accounts.wempos-forum.com/sitemap.xml\n");
-  assert.match(response.headers.get("Cache-Control") || "", /public/);
+  assertPublicCachePolicy(response);
+  assert.deepEqual(db.executed, [], "robots.txt must not execute D1 statements");
   assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
 });
 
 test("HEAD /robots.txt returns the same metadata without a response body", async () => {
+  const getResponse = await dispatch(new Request(ORIGIN + "/robots.txt"), {});
   const response = await dispatch(new Request(ORIGIN + "/robots.txt", { method: "HEAD" }), {});
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type") || "", /^text\/plain(?:;|$)/i);
   assert.equal(await response.text(), "");
+  assertDiscoveryMetadataMatches(getResponse, response);
 });
 
 test("GET /sitemap.xml serves a valid XML sitemap of canonical public pages", async () => {
@@ -51,13 +73,15 @@ test("GET /sitemap.xml serves a valid XML sitemap of canonical public pages", as
   assert.deepEqual([...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]), [
     "https://accounts.wempos-forum.com/",
   ]);
-  assert.match(response.headers.get("Cache-Control") || "", /public/);
+  assertPublicCachePolicy(response);
 });
 
 test("HEAD /sitemap.xml returns sitemap metadata without a response body", async () => {
+  const getResponse = await dispatch(new Request(ORIGIN + "/sitemap.xml"), {});
   const response = await dispatch(new Request(ORIGIN + "/sitemap.xml", { method: "HEAD" }), {});
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type") || "", /^application\/xml(?:;|$)/i);
   assert.equal(await response.text(), "");
+  assertDiscoveryMetadataMatches(getResponse, response);
 });
