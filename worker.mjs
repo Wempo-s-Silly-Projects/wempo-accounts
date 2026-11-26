@@ -14,7 +14,7 @@
 //
 // You should have received a copy of the
 // GNU Affero General Public License along with this program.  If not,
-// see <https://www.gnu.org/licenses/>
+// see <https://www.gnu.org/licenses>
 
 // Wempo Accounts — worker entrypoint. All handler logic lives under api/;
 // worker.mjs owns only the dispatch loop:
@@ -34,6 +34,8 @@ export { createSession } from "./api/core/auth.mjs";
 export { relayVerify, relaySet, relayRevokeAll } from "./api/relay.mjs";
 export { verifyTotpCode, totpAt } from "./api/core/totp.mjs";
 export { isValidUsername } from "./api/usernames.mjs";
+
+const ROBOTS_TXT = "User-agent: *\\nAllow: /\\nDisallow: /api/\\n";
 
 // The canonical accounts origin: every *.workers.dev request is moved here
 // with a permanent redirect before any routing (path + query preserved).
@@ -85,6 +87,14 @@ export default {
     const url = new URL(request.url);
     const redirect = canonicalRedirect(url);
     if (redirect) return redirect;
+    if (url.pathname === "/robots.txt" && (request.method === "GET" || request.method === "HEAD")) {
+      return secureResponse(new Response(request.method === "HEAD" ? null : ROBOTS_TXT, {
+        headers: {
+          "Cache-Control": "public, max-age=3600",
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+      }));
+    }
     if (url.pathname.startsWith("/api/")) {
       try {
         return await routeApi(request, env, ctx);
@@ -98,7 +108,7 @@ export default {
       // as the API: one discipline for every byte this worker emits.
       return secureResponse(await env.ASSETS.fetch(request));
     } catch (error) {
-      console.error("Static asset request failed:", error);
+      console.error("Accounts request failed:", error);
       return json({ error: "The requested page could not be loaded." }, 500);
     }
   },
