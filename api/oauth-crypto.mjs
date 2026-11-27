@@ -21,7 +21,7 @@ const RS256 = { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
 function base64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function decodeBase64Url(value) {
