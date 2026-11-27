@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS wa_oauth_authorization_codes (
 CREATE INDEX IF NOT EXISTS idx_wa_oauth_codes_expiry
   ON wa_oauth_authorization_codes(expires_at);
 
+CREATE INDEX IF NOT EXISTS idx_wa_oauth_codes_user_client
+  ON wa_oauth_authorization_codes(user_id, client_id, consumed_at);
+
 CREATE TABLE IF NOT EXISTS wa_oauth_access_tokens (
   token_hash TEXT PRIMARY KEY,
   client_id TEXT NOT NULL REFERENCES wa_oauth_clients(client_id) ON DELETE CASCADE,
@@ -44,3 +47,6 @@ CREATE TABLE IF NOT EXISTS wa_oauth_access_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_wa_oauth_tokens_expiry
   ON wa_oauth_access_tokens(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_wa_oauth_tokens_user_client
+  ON wa_oauth_access_tokens(user_id, client_id, revoked_at);
