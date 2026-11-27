@@ -27,7 +27,7 @@ const migration = path.join(
   "migrations",
   "0003_wa_oauth_provider.sql",
 );
-const sql = readFileSync(migration, "utf8").replace(/--[^\\n]*/g, "");
+const sql = readFileSync(migration, "utf8").replace(/--[^\n]*/g, "");
 
 test("migration 0003 creates only wa_-prefixed OAuth objects", () => {
   const statements = sql.split(";").map((part) => part.trim()).filter(Boolean);
@@ -36,10 +36,10 @@ test("migration 0003 creates only wa_-prefixed OAuth objects", () => {
     if (/^CREATE TABLE/i.test(statement)) {
       assert.match(statement, /^CREATE TABLE IF NOT EXISTS wa_oauth_[a-z_]+/i);
     } else {
-      assert.match(statement, /^CREATE INDEX IF NOT EXISTS idx_wa_oauth_[a-z_]+\\s+ON wa_oauth_[a-z_]+/i);
+      assert.match(statement, /^CREATE INDEX IF NOT EXISTS idx_wa_oauth_[a-z_]+\s+ON wa_oauth_[a-z_]+/i);
     }
   }
-  assert.doesNotMatch(sql, /\\b(DROP|ALTER|PRAGMA)\\b/i);
+  assert.doesNotMatch(sql, /\b(DROP|ALTER|PRAGMA)\b/i);
 });
 
 test("OAuth tables store hashes and enforce expiry, one-time codes, and client ownership", () => {
@@ -48,6 +48,6 @@ test("OAuth tables store hashes and enforce expiry, one-time codes, and client o
   assert.match(sql, /token_hash TEXT PRIMARY KEY/i);
   assert.match(sql, /consumed_at INTEGER NULL/i);
   assert.match(sql, /revoked_at INTEGER NULL/i);
-  assert.match(sql, /REFERENCES users\\(id\\)/i);
-  assert.match(sql, /CHECK \\(token_endpoint_auth_method IN \\('client_secret_basic', 'none'\\)\\)/i);
+  assert.match(sql, /REFERENCES users\(id\)/i);
+  assert.match(sql, /CHECK \(token_endpoint_auth_method IN \('client_secret_basic', 'none'\)\)/i);
 });
