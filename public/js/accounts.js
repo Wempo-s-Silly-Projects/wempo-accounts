@@ -587,6 +587,88 @@ function sessionsCard(signedOut) {
 // SAME manual ticket flow a fresh login runs (POST /api/sso/ticket → follow
 // the redirect the SERVER answers — never the raw parameter) and the known
 // member origins get their name in the label.
+// OAuth grants: connected applications can be disconnected by the account
+// owner, which revokes their live access tokens and invalidates pending codes.
+function oauthGrantsCard(signedOut) {
+  const list = el("div", { class: "session-list" },
+    el("p", { class: "form-note", text: "Loading connected applications…" }));
+  const error = el("p", { class: "form-error", hidden: "hidden" });
+  const notice = el("p", { class: "form-status", hidden: "hidden" });
+  let loading = false;
+
+  async function load() {
+    if (loading) return;
+    loading = true;
+    try {
+      const response = await fetch("/api/oauth/grants");
+      if (response.status === 401) {
+        signedOut();
+        return;
+      }
+      const data = await response.json();
+      if (!response.ok) throw new Error((data && data.error) || "Could not load connected applications.");
+      const applications = Array.isArray(data.applications) ? data.applications : [];
+      if (!applications.length) {
+        list.replaceChildren(el("p", { class: "form-note", text: "No connected applications." }));
+        return;
+      }
+      list.replaceChildren(...applications.map((application) => {
+        const row = el("div", { class: "session-row" },
+          el("span", {
+            class: "session-when",
+            text: application.client_name + " · " + application.active_tokens + " active token(s)",
+          }));
+        const revoke = el("button", { type: "button", class: "button button-small", text: "Disconnect" });
+        revoke.addEventListener("click", async () => {
+          revoke.disabled = true;
+          try {
+            const { status, data: result } = await postJson(
+              "/api/oauth/grants/revoke",
+              { client_id: application.client_id },
+              csrfHeaders(),
+            );
+            if (status === 401) {
+              signedOut();
+              return;
+            }
+            if (status !== 200) throw new Error((result && result.error) || "Could not disconnect this application.");
+            notice.textContent = "Disconnected " + application.client_name + ".";
+            notice.hidden = false;
+            await load();
+          } catch (why) {
+            error.textContent = why.message || "Could not disconnect this application.";
+            error.hidden = false;
+            revoke.disabled = false;
+          }
+        });
+        row.append(revoke);
+        return row;
+      }));
+    } catch {
+      list.replaceChildren(el("p", {
+        class: "form-note",
+        text: "Connected applications could not be loaded. Try again.",
+      }));
+    } finally {
+      loading = false;
+    }
+  }
+
+  load();
+  return el(
+    "div",
+    { class: "auth-card" },
+    el("h2", { text: "Connected applications" }),
+    el("p", {
+      class: "form-note",
+      text: "Disconnect an application to revoke its active access tokens and pending sign-in codes.",
+    }),
+    list,
+    error,
+    notice,
+  );
+}
+
 function continueBackCard() {
   const siteName = SSO_SITE_NAMES[ssoReturn] || "that site";
   const goLabel = "Continue to " + siteName;
@@ -634,7 +716,7 @@ function signedInView(user) {
     csrfToken = null;
     renderLogin();
   };
-  const cards = [identityCard(user), passwordChangeCard(signedOut), sessionsCard(signedOut)];
+  const cards = [identityCard(user), passwordChangeCard(signedOut), sessionsCard(signedOut), oauthGrantsCard(signedOut)];
   if (ssoReturn) cards.unshift(continueBackCard());
   return cards;
 }
