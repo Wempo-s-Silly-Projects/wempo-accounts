@@ -23,6 +23,19 @@ let signingIn = false;
 // sole enforcement point; it answers a redirect only for an allowed origin.
 const ssoReturn = new URLSearchParams(window.location.search).get("return") || null;
 
+const oauthRequest = (() => {
+  const value = new URLSearchParams(window.location.search).get("oauth_request");
+  if (!value) return null;
+  try {
+    const target = new URL(value, window.location.origin);
+    return target.origin === window.location.origin && target.pathname === "/oauth2/authorize"
+      ? target.href
+      : null;
+  } catch {
+    return null;
+  }
+})();
+
 // The member-site names the continue-back card can speak of (the known
 // member origin). The ?return value is NEVER trusted with navigation — the
 // server's POST /api/sso/ticket allowlist and its redirect answer are the
@@ -73,6 +86,10 @@ async function postJson(path, body, headers = {}) {
 // lands on the plain signed-in view; the member keeps their accounts-site
 // session either way.
 async function finishLogin(user) {
+  if (oauthRequest) {
+    window.location.assign(oauthRequest);
+    return;
+  }
   if (!ssoReturn) {
     renderSignedIn(user);
     return;
@@ -687,6 +704,10 @@ async function boot() {
     if (response.ok) {
       const data = await response.json();
       csrfToken = data.csrfToken;
+      if (oauthRequest) {
+        window.location.assign(oauthRequest);
+        return;
+      }
       // A PLAIN arrival with ?return= and a pre-existing session renders the
       // signed-in view — never an auto-ticket. Auto-ticketing on every
       // arrival turned any sibling site's persistent redeem refusal into a
