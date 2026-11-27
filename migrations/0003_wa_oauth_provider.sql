@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS wa_oauth_authorization_codes (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   redirect_uri TEXT NOT NULL,
   scope TEXT NOT NULL,
+  auth_time INTEGER NOT NULL,
   code_challenge TEXT NOT NULL,
   nonce TEXT NULL,
   expires_at INTEGER NOT NULL,
