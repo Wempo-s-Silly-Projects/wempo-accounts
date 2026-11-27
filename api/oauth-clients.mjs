@@ -17,7 +17,7 @@
 
 import { requireCsrf, readSession } from "./core/auth.mjs";
 import { nowSeconds, randomToken, sha256Hex } from "./core/crypto.mjs";
-import { HttpError, json, rateLimit, readJson } from "./core/http.mjs";
+import { HttpError, json, readJson, securityHeaders } from "./core/http.mjs";
 
 const SUPPORTED_SCOPES = new Set(["openid", "profile"]);
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{32,80}$/;
@@ -28,7 +28,7 @@ function ownerOnly(session) {
 }
 
 function validRedirectUri(value) {
-  if (typeof value !== "string" || value.length < 1 || value.length > 2048) return false;
+  if (typeof value !== "string" || value.length < 1 || value.length > 2048 || value.includes("#")) return false;
   try {
     const url = new URL(value);
     if (url.username || url.password || url.hash) return false;
@@ -82,7 +82,6 @@ async function listClients(request, env) {
 async function createClient(request, env) {
   const session = await requireCsrf(request, env);
   ownerOnly(session);
-  await rateLimit(request, env, "write");
   const body = await readJson(request);
   const name = typeof body.client_name === "string" ? body.client_name.trim() : "";
   const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris : [];
@@ -146,7 +145,7 @@ async function disableClient(request, env, clientId) {
       "UPDATE wa_oauth_authorization_codes SET consumed_at = ? WHERE client_id = ? AND consumed_at IS NULL",
     ).bind(now, clientId),
   ]);
-  return new Response(null, { status: 204 });
+  return new Response(null, { status: 204, headers: securityHeaders(new Headers({ "Cache-Control": "no-store" })) });
 }
 
 export async function handleOAuthClientRoutes(request, env, path, method) {
