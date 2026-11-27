@@ -31,7 +31,7 @@ function validRedirectUri(value) {
   if (typeof value !== "string" || value.length < 1 || value.length > 2048 || value.includes("#")) return false;
   try {
     const url = new URL(value);
-    if (url.username || url.password || url.hash) return false;
+    if (url.username || url.password || url.hash || url.hostname.includes("*")) return false;
     if (url.protocol === "https:") return true;
     if (url.protocol !== "http:") return false;
     return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
@@ -130,7 +130,6 @@ async function createClient(request, env) {
 async function disableClient(request, env, clientId) {
   const session = await requireCsrf(request, env);
   ownerOnly(session);
-  await rateLimit(request, env, "write");
   if (!CLIENT_ID_PATTERN.test(clientId)) throw new HttpError(404, "OAuth application not found.");
   const now = nowSeconds();
   const result = await env.FORUM_DB.prepare(
