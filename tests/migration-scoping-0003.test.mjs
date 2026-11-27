@@ -45,6 +45,7 @@ test("migration 0003 creates only wa_-prefixed OAuth objects", () => {
 test("OAuth tables store hashes and enforce expiry, one-time codes, and client ownership", () => {
   assert.match(sql, /client_secret_hash TEXT NULL/i);
   assert.match(sql, /code_hash TEXT PRIMARY KEY/i);
+  assert.match(sql, /auth_time INTEGER NOT NULL/i);
   assert.match(sql, /token_hash TEXT PRIMARY KEY/i);
   assert.match(sql, /consumed_at INTEGER NULL/i);
   assert.match(sql, /revoked_at INTEGER NULL/i);
