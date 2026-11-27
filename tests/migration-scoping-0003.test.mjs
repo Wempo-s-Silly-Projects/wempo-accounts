@@ -31,7 +31,7 @@ const sql = readFileSync(migration, "utf8").replace(/--[^\n]*/g, "");
 
 test("migration 0003 creates only wa_-prefixed OAuth objects", () => {
   const statements = sql.split(";").map((part) => part.trim()).filter(Boolean);
-  assert.equal(statements.length, 5);
+  assert.equal(statements.length, 7);
   for (const statement of statements) {
     if (/^CREATE TABLE/i.test(statement)) {
       assert.match(statement, /^CREATE TABLE IF NOT EXISTS wa_oauth_[a-z_]+/i);
