@@ -415,3 +415,57 @@ test("revocation is client-bound and removes the bearer token from userinfo", as
   assert.equal(userinfo.status, 401);
   assert.equal(state.tokens[0].revoked_at > 0, true);
 });
+
+test("members can list and revoke only their own connected OAuth applications", async () => {
+  const session = await liveSession();
+  const updates = [];
+  const env = { ...limiters() };
+  env.FORUM_DB = fakeDb([
+    {
+      test: (sql) => sql.includes("FROM wa_sso_sessions s LEFT JOIN users u"),
+      first: async (bound) => session.row.token_hash === bound[0] &&
+        Number(session.row.expires_at) > Number(bound[1]) ? session.row : null,
+    },
+    {
+      test: (sql) => sql.includes("FROM wa_oauth_access_tokens t JOIN wa_oauth_clients c"),
+      all: async () => [{
+        client_id: CLIENT_ID,
+        client_name: "Example Service",
+        token_count: 2,
+        latest_expiry: nowSeconds() + 1800,
+      }],
+    },
+    {
+      test: (sql) => sql.startsWith("UPDATE wa_oauth_access_tokens SET revoked_at = ?"),
+      run: async (bound) => {
+        updates.push({ table: "tokens", bound });
+        return { changes: 2 };
+      },
+    },
+    {
+      test: (sql) => sql.startsWith("UPDATE wa_oauth_authorization_codes SET consumed_at = ?"),
+      run: async (bound) => {
+        updates.push({ table: "codes", bound });
+        return { changes: 1 };
+      },
+    },
+  ]);
+
+  const listed = await dispatch(sessionRequest("/api/oauth/grants", "GET", undefined, session), env);
+  assert.equal(listed.status, 200);
+  const data = await listed.json();
+  assert.equal(data.applications[0].client_id, CLIENT_ID);
+  assert.equal(data.applications[0].client_name, "Example Service");
+  assert.equal(data.applications[0].active_tokens, 2);
+
+  const revoked = await dispatch(sessionRequest("/api/oauth/grants/revoke", "POST", {
+    client_id: CLIENT_ID,
+  }, session), env);
+  assert.equal(revoked.status, 200);
+  assert.deepEqual(await revoked.json(), { revoked_tokens: 2, invalidated_codes: 1 });
+  assert.deepEqual(updates.map((item) => item.table), ["tokens", "codes"]);
+  for (const item of updates) {
+    assert.equal(item.bound[1], CLIENT_ID);
+    assert.equal(item.bound[2], 7);
+  }
+});
