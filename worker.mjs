@@ -27,6 +27,7 @@
 // revocation routes (api/manage.mjs) plus the forum's token-gated relay leg
 // for the member sites' shared `sessions` table.
 import { handleAccountRoutes } from "./api/accounts.mjs";
+import { handleOAuthPublicRoutes } from "./api/oauth.mjs";
 import { HttpError, json, rateLimit, securityHeaders } from "./api/core/http.mjs";
 
 export { requireTurnstile, rateLimit, readJson } from "./api/core/http.mjs";
@@ -104,6 +105,12 @@ export default {
           "Content-Type": isRobots ? "text/plain; charset=utf-8" : "application/xml; charset=utf-8",
         },
       }));
+    }
+    try {
+      const oauthResponse = await handleOAuthPublicRoutes(request, env);
+      if (oauthResponse) return oauthResponse;
+    } catch (error) {
+      return apiError(error);
     }
     if (url.pathname.startsWith("/api/")) {
       try {
