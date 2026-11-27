@@ -31,7 +31,7 @@ async function signingEnv() {
     env: {
       OAUTH_SIGNING_PRIVATE_JWK: JSON.stringify(privateJwk),
       OAUTH_SIGNING_KID: "test-key-1",
-      OAUTH_SUBJECT_SECRET: "0123456789abcdef0123456789abcdef",
+      OAUTH_SUBJECT_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex"),
     },
     publicKey,
   };

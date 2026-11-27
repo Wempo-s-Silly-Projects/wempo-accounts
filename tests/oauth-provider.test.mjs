@@ -22,7 +22,8 @@ import { decodeJwtPart, publicSigningJwk } from "../api/oauth-crypto.mjs";
 import { nowSeconds } from "../api/core/crypto.mjs";
 
 const CLIENT_ID = "client_identifier_1234567890123456";
-const CLIENT_SECRET = "client-secret-for-test";
+// Generated per run so no credential-shaped literal lives in the source.
+const CLIENT_SECRET = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
 const REDIRECT_URI = "https://service.example/callback";
 const VERIFIER = "A".repeat(43);
 
@@ -45,14 +46,14 @@ async function signingEnvironment() {
   return {
     OAUTH_SIGNING_PRIVATE_JWK: JSON.stringify(privateJwk),
     OAUTH_SIGNING_KID: "test-oauth-key",
-    OAUTH_SUBJECT_SECRET: "test-subject-secret-0123456789abcdef",
+    OAUTH_SUBJECT_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex"),
     publicKey,
   };
 }
 
 async function liveSession() {
   const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
-  const csrfToken = "csrf-token-abcdefghijklmnopqrstuvwxyz0123";
+  const csrfToken = Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("base64url");
   return {
     token,
     csrfToken,
@@ -157,6 +158,21 @@ async function makeEnvironment({ sessionRow = null, codeRow = null, signing = nu
         const row = state.tokens.find((token) => token.token_hash === bound[0] &&
           token.revoked_at === null && token.expires_at > bound[1]);
         return row ? { ...row, username: "wempos" } : null;
+      },
+    },
+    {
+      test: (sql) => sql.startsWith("UPDATE wa_oauth_access_tokens SET revoked_at = ?") &&
+        sql.includes("created_at >= ?"),
+      run: async (bound) => {
+        let changes = 0;
+        for (const token of state.tokens) {
+          if (token.client_id === bound[1] && token.user_id === bound[2] &&
+              token.created_at >= bound[3] && token.revoked_at === null) {
+            token.revoked_at = bound[0];
+            changes += 1;
+          }
+        }
+        return { changes };
       },
     },
     {
@@ -268,6 +284,7 @@ test("consent creates a hashed, short-lived, single-use code bound to client, us
   assert.equal(redirect.origin, "https://service.example");
   assert.equal(redirect.pathname, "/callback");
   assert.equal(redirect.searchParams.get("state"), "state-from-client");
+  assert.equal(redirect.searchParams.get("iss"), ORIGIN);
   const code = redirect.searchParams.get("code");
   assert.equal(typeof code, "string");
   assert.notEqual(state.authorizationInsert[0], code);
@@ -467,5 +484,60 @@ test("members can list and revoke only their own connected OAuth applications", 
   for (const item of updates) {
     assert.equal(item.bound[1], CLIENT_ID);
     assert.equal(item.bound[2], 7);
+  }
+});
+
+test("a replayed authorization code is refused and revokes the tokens it already issued", async () => {
+  const session = await liveSession();
+  const signing = await signingEnvironment();
+  const { env, state } = await makeEnvironment({ sessionRow: session.row, signing });
+  const body = Object.fromEntries(authorizationParams(await challenge(VERIFIER)).entries());
+  body.approved = true;
+  const consent = await dispatch(sessionRequest("/api/oauth/authorize", "POST", body, session), env);
+  const code = new URL((await consent.json()).redirect).searchParams.get("code");
+  const exchange = () => dispatch(new Request(ORIGIN + "/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: "Basic " + btoa(CLIENT_ID + ":" + CLIENT_SECRET),
+    },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI, code_verifier: VERIFIER }),
+  }), env);
+
+  assert.equal((await exchange()).status, 200);
+  assert.equal(state.tokens[0].revoked_at, null);
+  const replay = await exchange();
+  assert.equal(replay.status, 400);
+  assert.equal((await replay.json()).error, "invalid_grant");
+  assert.equal(state.tokens.length, 1);
+  assert.ok(state.tokens[0].revoked_at > 0, "the first exchange's token is revoked");
+});
+
+test("denying consent returns access_denied with state and issuer to the registered redirect", async () => {
+  const session = await liveSession();
+  const { env, state } = await makeEnvironment({ sessionRow: session.row });
+  const body = Object.fromEntries(authorizationParams(await challenge(VERIFIER)).entries());
+  body.approved = false;
+  const response = await dispatch(sessionRequest("/api/oauth/authorize", "POST", body, session), env);
+  assert.equal(response.status, 200);
+  const redirect = new URL((await response.json()).redirect);
+  assert.equal(redirect.origin + redirect.pathname, REDIRECT_URI);
+  assert.equal(redirect.searchParams.get("error"), "access_denied");
+  assert.equal(redirect.searchParams.get("state"), "state-from-client");
+  assert.equal(redirect.searchParams.get("iss"), ORIGIN);
+  assert.equal(redirect.searchParams.get("code"), null);
+  assert.equal(state.authorizationInsert, null);
+});
+
+test("authorization rejects control characters in state and requests without openid", async () => {
+  const session = await liveSession();
+  const { env } = await makeEnvironment({ sessionRow: session.row });
+  const query = authorizationParams(await challenge(VERIFIER));
+  for (const [key, value] of [["state", "bad\u0007state"], ["scope", "profile"], ["code_challenge_method", "plain"]]) {
+    const body = Object.fromEntries(query.entries());
+    body[key] = value;
+    body.approved = true;
+    const response = await dispatch(sessionRequest("/api/oauth/authorize", "POST", body, session), env);
+    assert.equal(response.status, 400, key + " must be rejected");
   }
 });

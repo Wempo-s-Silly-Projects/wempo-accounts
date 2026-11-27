@@ -28,10 +28,10 @@ const request = {
   nonce: params.get("nonce") || "",
 };
 
-const scopeDescriptions = {
-  openid: "Confirm your Wempo Account identity",
-  profile: "Share your Wempo username and display name",
-};
+const scopeDescriptions = new Map([
+  ["openid", "Confirm your Wempo Account identity"],
+  ["profile", "Share your Wempo username and display name"],
+]);
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -106,7 +106,7 @@ async function boot() {
     );
     const list = element("ul", null, "oauth-scope-list");
     for (const scope of info.scopes || []) {
-      list.append(element("li", scopeDescriptions[scope] || scope));
+      list.append(element("li", scopeDescriptions.get(scope) || scope));
     }
     card.append(list);
     card.append(element("p", "You can disconnect this application later from Connected applications in Wempo Accounts.", "form-note"));

@@ -22,7 +22,7 @@ import { nowSeconds } from "../api/core/crypto.mjs";
 
 async function liveSession(role = "admin") {
   const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
-  const csrfToken = "csrf-token-abcdefghijklmnopqrstuvwxyz0123";
+  const csrfToken = Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("base64url");
   return {
     token,
     csrfToken,

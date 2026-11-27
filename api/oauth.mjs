@@ -28,6 +28,9 @@ const SUPPORTED_SCOPES = new Set(["openid", "profile"]);
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{32,80}$/;
 const CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/;
+const AUTHORIZATION_FIELDS = new Set([
+  "response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method", "nonce",
+]);
 const encoder = new TextEncoder();
 
 function oauthError(error, description, status = 400, headers = {}) {
@@ -87,35 +90,41 @@ async function clientById(env, clientId) {
   return row;
 }
 
+function requireRequest(condition, message) {
+  if (!condition) throw new HttpError(400, message);
+}
+
+function hasControlCharacter(value) {
+  for (const character of value) {
+    const code = character.codePointAt(0);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
+function scopesAllowed(scopes, client) {
+  if (!scopes.length || scopes.length !== new Set(scopes).size || !scopes.includes("openid")) return false;
+  return scopes.every((scope) => SUPPORTED_SCOPES.has(scope) && client.scopes.includes(scope));
+}
+
 function authorizationRequest(params, client) {
   const redirectUri = params.get("redirect_uri") || "";
-  const requestedScope = params.get("scope") || "";
-  const scopes = requestedScope.split(" ").filter(Boolean);
+  const scopes = (params.get("scope") || "").split(" ").filter(Boolean);
   const state = params.get("state") || "";
   const codeChallenge = params.get("code_challenge") || "";
   const nonce = params.get("nonce") || null;
 
-  if (params.get("response_type") !== "code") {
-    throw new HttpError(400, "Only the authorization code response type is supported.");
-  }
-  if (!client || !client.redirectUris.includes(redirectUri)) {
-    throw new HttpError(400, "The OAuth client or redirect URI is not registered.");
-  }
-  if (!scopes.length || scopes.length !== new Set(scopes).size ||
-      scopes.some((scope) => !SUPPORTED_SCOPES.has(scope) || !client.scopes.includes(scope)) ||
-      !scopes.includes("openid")) {
-    throw new HttpError(400, "The requested scopes are not supported by this application.");
-  }
-  if (!state || state.length > 512 || /[\u0000-\u001f\u007f]/.test(state)) {
-    throw new HttpError(400, "A valid state parameter is required.");
-  }
-  if (params.get("code_challenge_method") !== "S256" ||
-      !CODE_CHALLENGE_PATTERN.test(codeChallenge)) {
-    throw new HttpError(400, "PKCE with the S256 challenge method is required.");
-  }
-  if (nonce !== null && (nonce.length < 1 || nonce.length > 256)) {
-    throw new HttpError(400, "The nonce parameter is not valid.");
-  }
+  requireRequest(params.get("response_type") === "code",
+    "Only the authorization code response type is supported.");
+  requireRequest(client && client.redirectUris.includes(redirectUri),
+    "The OAuth client or redirect URI is not registered.");
+  requireRequest(scopesAllowed(scopes, client),
+    "The requested scopes are not supported by this application.");
+  requireRequest(state && state.length <= 512 && !hasControlCharacter(state),
+    "A valid state parameter is required.");
+  requireRequest(params.get("code_challenge_method") === "S256" && CODE_CHALLENGE_PATTERN.test(codeChallenge),
+    "PKCE with the S256 challenge method is required.");
+  requireRequest(nonce === null || nonce.length <= 256, "The nonce parameter is not valid.");
   return {
     clientId: client.client_id,
     clientName: client.client_name,
@@ -172,8 +181,8 @@ async function authorizeDecision(request, env) {
   if (!session?.user) throw new HttpError(401, "Please sign in to continue.");
   const body = await readJson(request);
   const params = new URLSearchParams();
-  for (const key of ["response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method", "nonce"]) {
-    if (typeof body[key] === "string") params.set(key, body[key]);
+  for (const [key, value] of Object.entries(body)) {
+    if (AUTHORIZATION_FIELDS.has(key) && typeof value === "string") params.set(key, value);
   }
   const client = await clientById(env, params.get("client_id") || "");
   const authorization = authorizationRequest(params, client);
@@ -181,6 +190,7 @@ async function authorizeDecision(request, env) {
   if (body.approved !== true) {
     redirect.searchParams.set("error", "access_denied");
     redirect.searchParams.set("state", authorization.state);
+    redirect.searchParams.set("iss", ISSUER);
     return json({ redirect: redirect.toString() });
   }
 
@@ -205,6 +215,7 @@ async function authorizeDecision(request, env) {
 
   redirect.searchParams.set("code", code);
   redirect.searchParams.set("state", authorization.state);
+  redirect.searchParams.set("iss", ISSUER);
   return json({ redirect: redirect.toString() });
 }
 
@@ -245,23 +256,9 @@ async function authenticateClient(request, form, env) {
   return equalConstantTime(presentedHash, client.client_secret_hash) ? client : null;
 }
 
-async function tokenEndpoint(request, env) {
-  await rateLimit(request, env, "write");
-  let form;
-  try {
-    form = await readForm(request);
-  } catch (error) {
-    return oauthError("invalid_request", error.message, error.status || 400);
-  }
-  const grantType = form.get("grant_type");
-  if (grantType !== "authorization_code") {
-    return oauthError("unsupported_grant_type", "Only authorization_code is supported.");
-  }
-  const client = await authenticateClient(request, form, env);
-  if (!client) return oauthError("invalid_client", "Client authentication failed.", 401, {
-    "WWW-Authenticate": 'Basic realm="wempo-accounts"',
-  });
-
+// Validates the grant parameters, then loads the stored code for this client.
+// Returns the stored row or an OAuth error Response.
+async function storedAuthorizationCode(env, client, form, now) {
   const code = form.get("code") || "";
   const redirectUri = form.get("redirect_uri") || "";
   const verifier = form.get("code_verifier") || "";
@@ -270,22 +267,65 @@ async function tokenEndpoint(request, env) {
       !client.redirectUris.includes(redirectUri)) {
     return oauthError("invalid_grant", "The authorization code or PKCE verifier is not valid.");
   }
-
   const codeHash = await sha256Hex(code);
   const stored = await env.FORUM_DB.prepare(
     "SELECT code_hash, client_id, user_id, redirect_uri, scope, auth_time, code_challenge, nonce, expires_at, consumed_at " +
       "FROM wa_oauth_authorization_codes WHERE code_hash = ? AND client_id = ? LIMIT 1",
   ).bind(codeHash, client.client_id).first();
-  const now = nowSeconds();
+  if (stored && stored.consumed_at !== null) {
+    // RFC 6749 §4.1.2: a replayed code revokes the tokens it already produced.
+    await env.FORUM_DB.prepare(
+      "UPDATE wa_oauth_access_tokens SET revoked_at = ? " +
+        "WHERE client_id = ? AND user_id = ? AND created_at >= ? AND revoked_at IS NULL",
+    ).bind(now, client.client_id, Number(stored.user_id), Number(stored.consumed_at)).run();
+  }
   if (!stored || stored.consumed_at !== null || Number(stored.expires_at) <= now ||
       stored.redirect_uri !== redirectUri) {
     return oauthError("invalid_grant", "The authorization code is expired or already used.");
   }
-
   const verifierHash = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(verifier))));
   if (!equalConstantTime(verifierHash, stored.code_challenge)) {
     return oauthError("invalid_grant", "The PKCE verifier does not match.");
   }
+  return stored;
+}
+
+async function idTokenFor(env, client, stored, user, now) {
+  const subject = await pairwiseSubject(env, client.client_id, Number(user.id));
+  const profile = stored.scope.split(" ").includes("profile")
+    ? { preferred_username: user.username, name: user.username }
+    : {};
+  return signJwt(env, {
+    iss: ISSUER,
+    sub: subject,
+    aud: client.client_id,
+    exp: now + ID_TOKEN_TTL_SECONDS,
+    iat: now,
+    auth_time: Number(stored.auth_time),
+    ...(stored.nonce ? { nonce: stored.nonce } : {}),
+    ...profile,
+  });
+}
+
+async function tokenEndpoint(request, env) {
+  await rateLimit(request, env, "write");
+  let form;
+  try {
+    form = await readForm(request);
+  } catch (error) {
+    return oauthError("invalid_request", error.message, error.status || 400);
+  }
+  if (form.get("grant_type") !== "authorization_code") {
+    return oauthError("unsupported_grant_type", "Only authorization_code is supported.");
+  }
+  const client = await authenticateClient(request, form, env);
+  if (!client) return oauthError("invalid_client", "Client authentication failed.", 401, {
+    "WWW-Authenticate": 'Basic realm="wempo-accounts"',
+  });
+
+  const now = nowSeconds();
+  const stored = await storedAuthorizationCode(env, client, form, now);
+  if (stored instanceof Response) return stored;
 
   const user = await env.FORUM_DB.prepare(
     "SELECT id, username FROM users WHERE id = ? LIMIT 1",
@@ -293,25 +333,8 @@ async function tokenEndpoint(request, env) {
   if (!user) return oauthError("invalid_grant", "The account for this authorization code no longer exists.");
 
   let idToken;
-  let accessToken;
-  let accessTokenHash;
   try {
-    const subject = await pairwiseSubject(env, client.client_id, Number(user.id));
-    idToken = await signJwt(env, {
-      iss: ISSUER,
-      sub: subject,
-      aud: client.client_id,
-      exp: now + ID_TOKEN_TTL_SECONDS,
-      iat: now,
-      auth_time: Number(stored.auth_time),
-      ...(stored.nonce ? { nonce: stored.nonce } : {}),
-      ...(stored.scope.split(" ").includes("profile") ? {
-        preferred_username: user.username,
-        name: user.username,
-      } : {}),
-    });
-    accessToken = randomToken(32);
-    accessTokenHash = await sha256Hex(accessToken);
+    idToken = await idTokenFor(env, client, stored, user, now);
   } catch (error) {
     console.error("OAuth signing configuration failed:", error && error.name ? error.name : "UnknownError");
     return oauthError("server_error", "The identity provider is not configured.", 503);
@@ -320,19 +343,20 @@ async function tokenEndpoint(request, env) {
   const consumed = await env.FORUM_DB.prepare(
     "UPDATE wa_oauth_authorization_codes SET consumed_at = ? " +
       "WHERE code_hash = ? AND client_id = ? AND consumed_at IS NULL AND expires_at > ?",
-  ).bind(now, codeHash, client.client_id, now).run();
+  ).bind(now, stored.code_hash, client.client_id, now).run();
   if (Number(consumed.meta?.changes) !== 1) {
     return oauthError("invalid_grant", "The authorization code is expired or already used.");
   }
 
-  const expiresAt = now + ACCESS_TOKEN_TTL_SECONDS;
+  const bearer = randomToken(32);
   await env.FORUM_DB.prepare(
     "INSERT INTO wa_oauth_access_tokens (token_hash, client_id, user_id, scope, created_at, expires_at) " +
       "VALUES (?, ?, ?, ?, ?, ?)",
-  ).bind(accessTokenHash, client.client_id, Number(user.id), stored.scope, now, expiresAt).run();
+  ).bind(await sha256Hex(bearer), client.client_id, Number(user.id), stored.scope, now,
+    now + ACCESS_TOKEN_TTL_SECONDS).run();
 
   return json({
-    access_token: accessToken,
+    access_token: bearer,
     token_type: "Bearer",
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
     scope: stored.scope,
@@ -400,6 +424,7 @@ function authorizationServerMetadata() {
     jwks_uri: ISSUER + "/.well-known/jwks.json",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
+    authorization_response_iss_parameter_supported: true,
     grant_types_supported: ["authorization_code"],
     subject_types_supported: ["pairwise"],
     scopes_supported: ["openid", "profile"],
@@ -414,7 +439,7 @@ function authorizationServerMetadata() {
   };
 }
 
-async function jwksEndpoint(env) {
+function jwksEndpoint(env) {
   try {
     return json({ keys: [publicSigningJwk(env)] });
   } catch {
