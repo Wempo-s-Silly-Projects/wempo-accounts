@@ -109,7 +109,7 @@ async function boot() {
       list.append(element("li", scopeDescriptions[scope] || scope));
     }
     card.append(list);
-    card.append(element("p", "You can revoke this application's access later by disabling it through Wempo Accounts.", "form-note"));
+    card.append(element("p", "You can disconnect this application later from Connected applications in Wempo Accounts.", "form-note"));
 
     const actions = element("div", null, "oauth-actions");
     const approve = element("button", "Allow", "button");
