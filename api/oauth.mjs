@@ -23,6 +23,7 @@ import { pairwiseSubject, publicSigningJwk, signJwt } from "./oauth-crypto.mjs";
 const ISSUER = "https://accounts.wempos-forum.com";
 const AUTH_CODE_TTL_SECONDS = 300;
 const ACCESS_TOKEN_TTL_SECONDS = 3600;
+const ID_TOKEN_TTL_SECONDS = 300;
 const SUPPORTED_SCOPES = new Set(["openid", "profile"]);
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{32,80}$/;
 const CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -61,7 +62,11 @@ async function readForm(request) {
   } catch {
     throw new HttpError(400, "The form body is not valid UTF-8.");
   }
-  return new URLSearchParams(decoded);
+  const form = new URLSearchParams(decoded);
+  for (const key of new Set(form.keys())) {
+    if (form.getAll(key).length !== 1) throw new HttpError(400, "The form contains a repeated parameter.");
+  }
+  return form;
 }
 
 async function clientById(env, clientId) {
@@ -296,7 +301,7 @@ async function tokenEndpoint(request, env) {
       iss: ISSUER,
       sub: subject,
       aud: client.client_id,
-      exp: now + ACCESS_TOKEN_TTL_SECONDS,
+      exp: now + ID_TOKEN_TTL_SECONDS,
       iat: now,
       auth_time: Number(stored.auth_time),
       ...(stored.nonce ? { nonce: stored.nonce } : {}),
@@ -472,7 +477,7 @@ export async function handleOAuthPublicRoutes(request, env) {
 
   if (path === "/.well-known/openid-configuration" ||
       path === "/.well-known/oauth-authorization-server") {
-    if (method !== "GET" && method !== "HEAD") return oauthError("invalid_request", "Method not allowed.", 405, { Allow: "GET, HEAD" });
+    if (method !== "GET") return oauthError("invalid_request", "Method not allowed.", 405, { Allow: "GET" });
     const metadata = authorizationServerMetadata();
     return json(metadata);
   }
