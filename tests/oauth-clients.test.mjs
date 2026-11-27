@@ -146,7 +146,7 @@ test("client listing never exposes stored client-secret hashes", async () => {
   const session = await liveSession();
   const env = oauthEnv(session.row, {
     clientRows: [{
-      client_id: "client_identifier_123456789012",
+      client_id: "client_identifier_1234567890123456",
       client_name: "Example",
       redirect_uris_json: '["https://example.com/callback"]',
       token_endpoint_auth_method: "client_secret_basic",
@@ -169,7 +169,7 @@ test("disabling a client revokes its access tokens and consumes pending codes", 
   const updates = [];
   const env = oauthEnv(session.row, { updates });
   const response = await dispatch(request(
-    "/api/oauth/clients/client_identifier_123456789012",
+    "/api/oauth/clients/client_identifier_1234567890123456",
     "DELETE",
     undefined,
     session,
