@@ -74,7 +74,7 @@ export async function readSession(request, env) {
   if (!token || !/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
   const tokenHash = await sha256Hex(token);
   const row = await env.FORUM_DB.prepare(
-    "SELECT s.session_id, s.token_hash, s.user_id, s.csrf_token, s.expires_at, " +
+    "SELECT s.session_id, s.token_hash, s.user_id, s.csrf_token, s.created_at, s.expires_at, " +
       "u.username, u.role, u.totp_enabled " +
       "FROM wa_sso_sessions s LEFT JOIN users u ON u.id = s.user_id " +
       "WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1",
@@ -94,7 +94,7 @@ export async function readSession(request, env) {
       totpEnabled: Number(row.totp_enabled) === 1,
     };
   }
-  return { tokenHash: row.token_hash, sessionId, csrfToken: row.csrf_token, expiresAt: Number(row.expires_at), user };
+  return { tokenHash: row.token_hash, sessionId, csrfToken: row.csrf_token, createdAt: Number(row.created_at), expiresAt: Number(row.expires_at), user };
 }
 
 export async function createSession(request, env, userId) {

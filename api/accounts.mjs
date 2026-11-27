@@ -44,6 +44,8 @@ import { handleRegisterRoute } from "./register.mjs";
 import { handleSsoRoutes } from "./sso.mjs";
 import { handleManageRoutes } from "./manage.mjs";
 import { isValidUsername } from "./usernames.mjs";
+import { handleOAuthClientRoutes } from "./oauth-clients.mjs";
+import { handleOAuthApiRoutes } from "./oauth.mjs";
 
 // Test seam: real deployments always run the
 // vendored requireTurnstile, which calls Cloudflare's siteverify endpoint.
@@ -160,6 +162,10 @@ export async function handleAccountRoutes(request, env, url, path, method, ctx) 
   }
   const ssoRoute = await handleSsoRoutes(request, env, path, method);
   if (ssoRoute) return ssoRoute;
+  const oauthRoute = await handleOAuthApiRoutes(request, env, path, method);
+  if (oauthRoute) return oauthRoute;
+  const oauthClientRoute = await handleOAuthClientRoutes(request, env, path, method);
+  if (oauthClientRoute) return oauthClientRoute;
   // The account-management routes (the signed-in page's lanes: the relayed
   // password change + the wa_sso_sessions revocation lane) live in manage.mjs.
   const manageRoute = await handleManageRoutes(request, env, path, method);
