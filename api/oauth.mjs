@@ -417,9 +417,51 @@ async function jwksEndpoint(env) {
   }
 }
 
+async function listUserGrants(request, env) {
+  const session = await readSession(request, env);
+  if (!session?.user) throw new HttpError(401, "Please sign in to manage connected applications.");
+  const result = await env.FORUM_DB.prepare(
+    "SELECT c.client_id, c.client_name, COUNT(*) AS token_count, MAX(t.expires_at) AS latest_expiry " +
+      "FROM wa_oauth_access_tokens t JOIN wa_oauth_clients c ON c.client_id = t.client_id " +
+      "WHERE t.user_id = ? AND t.revoked_at IS NULL AND t.expires_at > ? " +
+      "GROUP BY c.client_id, c.client_name ORDER BY c.client_name LIMIT 100",
+  ).bind(Number(session.user.id), nowSeconds()).all();
+  return json({
+    applications: (result.results || []).map((row) => ({
+      client_id: row.client_id,
+      client_name: row.client_name,
+      active_tokens: Number(row.token_count) || 0,
+      latest_expiry: Number(row.latest_expiry) || 0,
+    })),
+  });
+}
+
+async function revokeUserGrant(request, env) {
+  const session = await requireCsrf(request, env);
+  if (!session?.user) throw new HttpError(401, "Please sign in to manage connected applications.");
+  const body = await readJson(request);
+  const clientId = typeof body.client_id === "string" ? body.client_id : "";
+  if (!CLIENT_ID_PATTERN.test(clientId)) throw new HttpError(400, "Choose a valid connected application.");
+  const now = nowSeconds();
+  const tokens = await env.FORUM_DB.prepare(
+    "UPDATE wa_oauth_access_tokens SET revoked_at = ? " +
+      "WHERE client_id = ? AND user_id = ? AND revoked_at IS NULL",
+  ).bind(now, clientId, Number(session.user.id)).run();
+  const codes = await env.FORUM_DB.prepare(
+    "UPDATE wa_oauth_authorization_codes SET consumed_at = ? " +
+      "WHERE client_id = ? AND user_id = ? AND consumed_at IS NULL",
+  ).bind(now, clientId, Number(session.user.id)).run();
+  return json({
+    revoked_tokens: Number(tokens.meta?.changes) || 0,
+    invalidated_codes: Number(codes.meta?.changes) || 0,
+  });
+}
+
 export async function handleOAuthApiRoutes(request, env, path, method) {
   if (path === "/api/oauth/authorize-info" && method === "GET") return authorizeInfo(request, env);
   if (path === "/api/oauth/authorize" && method === "POST") return authorizeDecision(request, env);
+  if (path === "/api/oauth/grants" && method === "GET") return listUserGrants(request, env);
+  if (path === "/api/oauth/grants/revoke" && method === "POST") return revokeUserGrant(request, env);
   return undefined;
 }
 
