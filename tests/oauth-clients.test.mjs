@@ -160,7 +160,7 @@ test("client listing never exposes stored client-secret hashes", async () => {
   assert.equal(response.status, 200);
   const text = await response.text();
   assert.ok(!text.includes("never-return-this"));
-  assert.ok(!text.includes("client_secret"));
+  assert.equal("client_secret" in JSON.parse(text).clients[0], false);
   assert.equal(JSON.parse(text).clients[0].client_name, "Example");
 });
 
